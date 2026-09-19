@@ -860,7 +860,7 @@ async function shareExportFile() {
     }
   }
   saveExportFile();
-  showToast(SHARE_UNAVAILABLE_TOAST);
+  showToast(SHARE_UNAVAILABLE_TOAST, 4500);
 }
 
 async function generateExpenseExport(format) {
@@ -1242,11 +1242,11 @@ async function viewReceipt(expenseId) {
   viewMedia(receipt.storagePath, receipt.fileName);
 }
 
-function showToast(message) {
+function showToast(message, ms = 2800) {
   clearTimeout(toastTimer);
   toast.textContent = message;
   toast.hidden = false;
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 2800);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, ms);
 }
 
 function closeModals() {
