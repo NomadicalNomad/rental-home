@@ -193,6 +193,59 @@
             <label for="notes" class="sr-only">Property notes</label>
             <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
           </fieldset>
+          <fieldset id="homeFactsFields">
+            <legend>Home facts <span class="optional">(optional)</span></legend>
+            <div class="two-columns">
+              <label>Beds
+                <input name="beds" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder="3">
+              </label>
+              <label>Baths
+                <input name="baths" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder="2">
+              </label>
+            </div>
+            <div class="two-columns">
+              <label>Square feet
+                <input name="sqft" type="number" inputmode="numeric" min="0" step="1" placeholder="1600">
+              </label>
+              <label>Year built
+                <input name="yearBuilt" type="number" inputmode="numeric" min="1800" max="2100" step="1" placeholder="1998">
+              </label>
+            </div>
+            <label>Type
+              <select name="propertyType">
+                <option value="">Choose one</option>
+                <option>Single family</option>
+                <option>Townhouse</option>
+                <option>Condo</option>
+                <option>Multi-family</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <label>Description
+              <textarea name="description" rows="3" maxlength="1000" placeholder="One-story, two-car garage…"></textarea>
+            </label>
+          </fieldset>
+          <fieldset id="utilityFields">
+            <legend>Utilities &amp; trash <span class="optional">(optional)</span></legend>
+            <label>Electric company
+              <input name="utilityElectric" type="text" maxlength="80" placeholder="SMUD">
+            </label>
+            <label>Gas company
+              <input name="utilityGas" type="text" maxlength="80" placeholder="PG&amp;E">
+            </label>
+            <label>Water
+              <input name="utilityWater" type="text" maxlength="80" placeholder="City of Folsom">
+            </label>
+            <label>Utility notes
+              <textarea name="utilityNotes" rows="2" maxlength="400" placeholder="Who pays which bill"></textarea>
+            </label>
+            <label>Trash pickup
+              <input name="trashSchedule" type="text" maxlength="80" placeholder="Thursday mornings">
+            </label>
+            <label>Trash notes
+              <textarea name="trashNotes" rows="2" maxlength="400" placeholder="Bins out by 6am"></textarea>
+            </label>
+          </fieldset>
           <fieldset class="js-write">
             <legend>Photo <span class="optional">(optional)</span></legend>
             <button class="hero-photo compact" id="formPhotoTile" type="button" data-action="form-photo">
@@ -259,6 +312,8 @@
     <div id="photoSheet" class="modal-backdrop" hidden>
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="photoSheetTitle">
         <h2 id="photoSheetTitle">Property photo</h2>
+        <button class="sheet-row" id="viewPhotoButton" type="button" data-photo="view" hidden>View photo</button>
+        <button class="sheet-row js-write" id="makePrimaryButton" type="button" data-photo="primary" hidden>Use as list photo</button>
         <button class="sheet-row js-write" type="button" data-photo="camera">Take photo</button>
         <button class="sheet-row js-write" type="button" data-photo="library">Choose from library</button>
         <button class="sheet-row danger js-write" id="removePhotoButton" type="button" data-photo="remove" hidden>Remove photo</button>
@@ -338,7 +393,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <input id="restoreInput" type="file" accept="application/json,.json" hidden>
   <input id="photoCameraInput" type="file" accept="image/*" capture="environment" hidden>
-  <input id="photoLibraryInput" type="file" accept="image/*" hidden>
+  <input id="photoLibraryInput" type="file" accept="image/*" multiple hidden>
   <input id="receiptCameraInput" type="file" accept="image/*" capture="environment" hidden>
   <input id="receiptLibraryInput" type="file" accept="image/*" hidden>
   <input id="receiptPdfInput" type="file" accept="application/pdf,.pdf" hidden>

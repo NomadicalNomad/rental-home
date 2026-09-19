@@ -133,6 +133,10 @@ export function friendlyError(error) {
     if (
       hay.includes('expenses') ||
       hay.includes('receipts') ||
+      hay.includes('property_photos') ||
+      hay.includes('property_appliances') ||
+      hay.includes('tenants') ||
+      hay.includes('tenant_files') ||
       hay.includes('account-media') ||
       hay.includes('is_sample')
     ) {
