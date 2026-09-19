@@ -229,3 +229,11 @@ img { max-width: 100%; }
   .site-header .wrap { align-items: flex-start; }
   .nav { width: 100%; }
 }
+
+
+/* Hide Netlify identity/deploy badge overlay */
+iframe[title*="Netlify" i],
+.netlify-badge,
+#netlify-badge,
+[data-netlify-deploy-id],
+a.netlify-button { display: none !important; }
