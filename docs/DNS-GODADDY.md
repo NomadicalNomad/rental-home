@@ -58,6 +58,8 @@ What those do:
 
 **Delete leftover apex A records.** Netlify SSL fails if `@` has more than one A record. Remove parked-page IPs (common leftover: `Parked`, `Forwarded`, or a second A like `99.83.190.102`).
 
+**Wrong page:** If a browser shows **“Rent Manor / Simplifying Property Management”** (not “Your properties. Your people.”), that resolver is still on the parking IP, not Netlify. Confirm `A @` is **only** `75.2.60.5`, then wait for TTL. Our marketing HTML lives at `/site/` on Netlify.
+
 **www CNAME**
 
 1. If a **CNAME** or **Forwarding** row already exists for `www`, edit or delete the forwarding first.

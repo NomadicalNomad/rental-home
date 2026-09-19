@@ -13,6 +13,8 @@ After DNS (Damon / GoDaddy — see [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md))
 - Marketing: https://rentmanor.com/ (`www` → apex)
 - App (Sign in / Create account): https://app.rentmanor.com/
 
+**Right page check:** `A` for `@` must be **75.2.60.5** (Netlify). If a resolver still shows an extra A (parked / forwarded), you get an unrelated “Rent Manor / Simplifying Property Management” page — not this repo. Delete leftover apex A records (see the DNS doc).
+
 Until DNS is live, GitHub Pages still works:
 
 - Marketing: https://nomadicalnomad.github.io/rental-home/ → `site/`
@@ -116,7 +118,7 @@ Without `config.js` *and* without the inline production values, the app shows a 
 ## Deploy
 
 - **GitHub Pages (fallback):** branch `main` / root. `/` redirects to `site/`. App is at `/app/`.
-- **Netlify (preferred for rentmanor.com):** publish directory = repo root, empty build command. `netlify.toml` rewrites apex → `site/` and `app.rentmanor.com` → `app/`. Then follow [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md).
+- **Netlify (preferred for rentmanor.com):** publish directory = repo root, empty build command. `netlify.toml` rewrites apex → `site/` and `app.rentmanor.com` → `app/`. Pretty URLs are **off** so marketing HTML keeps relative `features.html` / `for-whom.html` links (never `/site/...` — those become `/site/site/...` 404s under the host rewrite). Apex pretty paths (`/features`, `/for-whom`, `/privacy`, `/terms`) map to `/site/*.html`. Then follow [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md).
 
 ## Privacy
 

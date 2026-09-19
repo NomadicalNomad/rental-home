@@ -3,14 +3,20 @@
 #   rentmanor.com (+ www → apex) → site/
 #   app.rentmanor.com             → app/
 #
-# Netlify Pretty URLs / canonical rewriting may turn relative site links into
-# absolute /site/... paths. Those must NOT go through the catch-all
-# rentmanor.com/* → /site/:splat (that would become /site/site/...).
-# More-specific /site/* and /app/* rules come first.
+# site/*.html must keep relative hrefs (features.html, never /site/...).
+# Pretty URLs used to rewrite those to /site/features in the served HTML.
+# Catch-all rentmanor.com/* → /site/:splat then made /site/site/features → 404.
+# pretty_urls is off so deployed HTML keeps relative .html links.
 
 [build]
   publish = "."
   command = ""
+
+[build.processing]
+  skip_processing = false
+
+[build.processing.html]
+  pretty_urls = false
 
 # www → apex
 [[redirects]]
@@ -38,7 +44,118 @@
   status = 200
   force = true
 
-# Apex: already-/site/ paths (Pretty URL absolute links) — do not double-prefix
+# Heal double-prefix 404s from old Pretty URL absolute hrefs + catch-all
+[[redirects]]
+  from = "https://rentmanor.com/site/site/*"
+  to = "/site/:splat"
+  status = 200
+  force = true
+
+# Apex pretty paths → real files (Pretty URLs off; typed /features still works)
+[[redirects]]
+  from = "https://rentmanor.com/features"
+  to = "/site/features.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/features.html"
+  to = "/site/features.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/for-whom"
+  to = "/site/for-whom.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/for-whom.html"
+  to = "/site/for-whom.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/privacy"
+  to = "/site/privacy.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/privacy.html"
+  to = "/site/privacy.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/terms"
+  to = "/site/terms.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/terms.html"
+  to = "/site/terms.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/index.html"
+  to = "/site/index.html"
+  status = 200
+  force = true
+
+# Cached / bookmarked Pretty URL absolute paths → the real file
+[[redirects]]
+  from = "https://rentmanor.com/site/features"
+  to = "/site/features.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/features.html"
+  to = "/site/features.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/for-whom"
+  to = "/site/for-whom.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/for-whom.html"
+  to = "/site/for-whom.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/privacy"
+  to = "/site/privacy.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/privacy.html"
+  to = "/site/privacy.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/terms"
+  to = "/site/terms.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site/terms.html"
+  to = "/site/terms.html"
+  status = 200
+  force = true
+
+# Apex: leftover /site/* paths (assets, images) — do not double-prefix
 [[redirects]]
   from = "https://rentmanor.com/site/*"
   to = "/site/:splat"
@@ -58,7 +175,7 @@
   status = 200
   force = true
 
-# Apex → marketing folder for bare paths (/features.html, /)
+# Apex → marketing folder for remaining bare paths
 [[redirects]]
   from = "https://rentmanor.com/*"
   to = "/site/:splat"
