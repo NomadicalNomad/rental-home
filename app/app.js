@@ -319,6 +319,7 @@ async function loadProperties() {
   }
   usingSampleFallback = false;
   properties = (data || []).map(fromRow);
+  if (sampleMode && !properties.length) applySampleFallback();
 }
 
 async function loadExpenses(propertyId) {
@@ -1625,6 +1626,7 @@ function resetLocalState() {
   properties = [];
   expensesByProperty = new Map();
   receiptsByExpense = new Map();
+  usingSampleFallback = false;
   activeFilter = 'all';
   editingId = null;
   editingExpenseId = null;
