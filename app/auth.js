@@ -1,5 +1,6 @@
 /* Auth + account + invite for RentManor (vanilla PWA, Supabase). */
 import { isSampleAccountId } from './account-scope.js';
+import { friendlyError as formatFriendlyError } from './errors.js';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/+esm';
 const INVITE_STORAGE_KEY = 'rental-home-invite-token';
 const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';
@@ -54,46 +55,7 @@ export function clearInviteToken() {
 }
 
 export function friendlyError(error) {
-  const message = String(error?.message || error || '').toLowerCase();
-  if (message.includes('configure') || message.includes('config.js')) return String(error.message || error);
-  if (message.includes('invalid login') || message.includes('invalid credentials')) {
-    return 'That email or password doesn’t match.';
-  }
-  if (message.includes('already registered') || message.includes('already been registered') || message.includes('user already exists')) {
-    return 'That email already has an account. Try signing in.';
-  }
-  if (message.includes('password') && (message.includes('6') || message.includes('least') || message.includes('weak') || message.includes('short'))) {
-    return 'Please use a password with at least 6 characters.';
-  }
-  if (message.includes('email not confirmed') || message.includes('confirm')) {
-    return 'Please check your email to finish creating your account, then sign in.';
-  }
-  if (message.includes('valid email') || message.includes('unable to validate email')) {
-    return 'Please enter a valid email address.';
-  }
-  if (message.includes('invite was created for a different email')) {
-    return 'This invite was made for a different email address.';
-  }
-  if (message.includes('invite has expired')) return 'That invite has expired. Ask them to send a new one.';
-  if (message.includes('invite code was not found') || message.includes('missing invite')) {
-    return 'That invite code was not found.';
-  }
-  if (message.includes('only the account owner')) {
-    return 'Only the account owner can invite someone.';
-  }
-  if (message.includes('schema cache') || message.includes('does not exist') || message.includes('could not find the function') || message.includes('could not find the table')) {
-    return 'This project isn’t finished setting up. Paste supabase/schema.sql into the Supabase SQL editor, then try again.';
-  }
-  if (message.includes('bucket') || message.includes('storage') || message.includes('payload too large') || message.includes('maximum allowed size')) {
-    return 'Couldn’t save that file. Try a smaller photo or PDF, or finish the Storage setup in the README.';
-  }
-  if (message.includes('failed to fetch') || message.includes('network') || message.includes('fetch')) {
-    return 'Could not connect. Check your internet and try again.';
-  }
-  if (message.includes('not allowed') || message.includes('row-level security') || message.includes('rls')) {
-    return 'You don’t have access to that.';
-  }
-  return 'Something went wrong. Please try again.';
+  return formatFriendlyError(error);
 }
 
 function captureInviteFromUrl() {

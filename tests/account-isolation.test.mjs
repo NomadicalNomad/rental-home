@@ -80,6 +80,7 @@ test('PWA deleted auto-seed paths (maybeSeedSampleData / seedProperties)', () =>
   assert.doesNotMatch(appJs, /insertProperties\(\s*seedProperties\(\)\s*\)/);
   assert.match(appJs, /samplePortfolio\(\)/);
   assert.match(appJs, /if \(sampleMode\)/);
+  assert.match(appJs, /function assertWritable/);
 });
 
 test('schema.sql keeps member RLS and never auto-seeds personal accounts', () => {

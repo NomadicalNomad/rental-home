@@ -1,5 +1,16 @@
 /* Per-property expense export (CSV / printable PDF). No receipt binaries. */
 
+export const SHARE_UNAVAILABLE_TOAST = 'File saved — use your share menu';
+
+export function canShareFiles(file, nav = typeof navigator !== 'undefined' ? navigator : undefined) {
+  if (!file || !nav?.canShare) return false;
+  try {
+    return Boolean(nav.canShare({ files: [file] }));
+  } catch (_) {
+    return false;
+  }
+}
+
 function csvCell(value) {
   const text = String(value ?? '');
   if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;

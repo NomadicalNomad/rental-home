@@ -4,6 +4,7 @@ import {
   canMutateAccount,
   rowsForAccount,
   samplePortfolio,
+  sampleWriteError,
   scopedAccountId,
   shouldInjectDemoProperties
 } from './account-scope.js';
@@ -26,6 +27,8 @@ import {
   parseSampleRoute,
   setSampleHash
 } from './auth.js';
+import { isMissingColumnError } from './errors.js';
+import { toPropertyRow, withoutThumbnailPath } from './property-row.js';
 import {
   thumbnailObjectPath,
   receiptObjectPath,
@@ -38,7 +41,7 @@ import {
   resolveMediaUrl,
   revokeObjectUrl
 } from './media.js';
-import { expensesToCsv, expensesToPdf, exportFileName, exportTotals } from './export.js';
+import { canShareFiles, expensesToCsv, expensesToPdf, exportFileName, exportTotals, SHARE_UNAVAILABLE_TOAST } from './export.js';
 
 const LEGACY_KEY = 'rental-home-data-v1';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -195,26 +198,31 @@ function fromRow(row) {
   };
 }
 
+function assertWritable() {
+  if (!canWrite()) throw sampleWriteError();
+  if (!getAccount()?.id) throw new Error('Sign in again to save this home.');
+}
+
 function toRow(property) {
   assertWritable();
-  const account = getAccount();
-  return {
-    id: property.id,
-    account_id: account.id,
-    address: property.address,
-    city: property.city,
-    state: property.state,
-    zip: property.zip,
-    status: property.status,
-    tenant_name: property.tenantName || '',
-    phone: property.phone || '',
-    email: property.email || '',
-    rent: property.rent || '',
-    notes: property.notes || '',
-    thumbnail_path: property.thumbnailPath || null,
-    created_at: property.createdAt,
-    updated_at: property.updatedAt
-  };
+  return toPropertyRow(property, getAccount().id);
+}
+
+async function writePropertyRows(rows, { existingId = null } = {}) {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error('Could not connect. Check your internet and try again.');
+  const table = supabase.from('properties');
+  const first = existingId
+    ? await table.update(rows[0]).eq('id', existingId)
+    : await table.insert(rows);
+  if (!first.error) return;
+  const missingThumb = rows.some(row => row.thumbnail_path) && isMissingColumnError(first.error, 'thumbnail_path');
+  if (!missingThumb) throw first.error;
+  const fallback = rows.map(withoutThumbnailPath);
+  const retry = existingId
+    ? await supabase.from('properties').update(fallback[0]).eq('id', existingId)
+    : await supabase.from('properties').insert(fallback);
+  if (retry.error) throw retry.error;
 }
 
 function fromExpenseRow(row) {
@@ -358,9 +366,7 @@ async function loadReceipts(expenseId) {
 
 async function insertProperties(list) {
   if (!list.length) return;
-  const supabase = getSupabase();
-  const { error } = await supabase.from('properties').insert(list.map(toRow));
-  if (error) throw error;
+  await writePropertyRows(list.map(toRow));
 }
 
 function escapeHTML(value) {
@@ -726,14 +732,8 @@ async function submitForm(event) {
     : { ...result.data, id: makeId(), thumbnailPath: '', createdAt: now, updatedAt: now };
   submit.disabled = true;
   try {
-    const supabase = getSupabase();
-    if (existing) {
-      const { error } = await supabase.from('properties').update(toRow(saved)).eq('id', saved.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.from('properties').insert(toRow(saved));
-      if (error) throw error;
-    }
+    if (existing) await writePropertyRows([toRow(saved)], { existingId: saved.id });
+    else await writePropertyRows([toRow(saved)]);
     const withPhoto = await savePropertyPhoto(saved);
     pendingPhotoFile = null;
     revokeObjectUrl(pendingPhotoPreview);
@@ -847,7 +847,7 @@ function saveExportFile() {
 async function shareExportFile() {
   if (!pendingExport) return;
   const file = pendingExport.file;
-  if (navigator.canShare && file && navigator.canShare({ files: [file] })) {
+  if (canShareFiles(file)) {
     try {
       await navigator.share({
         files: [file],
@@ -860,6 +860,7 @@ async function shareExportFile() {
     }
   }
   saveExportFile();
+  showToast(SHARE_UNAVAILABLE_TOAST);
 }
 
 async function generateExpenseExport(format) {

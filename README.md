@@ -84,6 +84,14 @@ Photos and receipts live in the private `account-media` bucket:
 - Thumbnail: `{account_id}/properties/{property_id}/thumbnail` (+ extension)
 - Receipt: `{account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}` (+ extension)
 
+## Ops — run the photos/expenses SQL on live
+
+**Builder is applying this in parallel. Live personal Add home / photos / expenses will fail until it lands.**
+
+If the project already applied an older `supabase/schema.sql`, run `supabase/migrations/20260919_photos_expenses_sample.sql` in the Supabase SQL editor (safe to re-run; does not wipe personal accounts or auto-seed Folsom into them). New projects can paste the current `supabase/schema.sql` instead.
+
+That SQL adds `properties.thumbnail_path`, `expenses`, `receipts`, private `account-media`, and the shared sample account. Until it is applied, Add home without a photo still works (the app omits the empty thumbnail column). Saving a photo or expense needs the new columns. The app now shows “This app update needs a database update — contact support” (or the real PostgREST message) instead of a generic “Something went wrong.”
+
 ## How to configure (Damon)
 
 This app talks to **Supabase** (email/password auth + Postgres + row-level security). There are no demo logins in the repo.
@@ -119,7 +127,7 @@ Production `app/index.html` also inlines the same public `window.RENTAL_HOME_CON
 ## Files
 
 - `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms)
-- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `media.js`, `manifest.json`, `sw.js`, `icons/`, `sample-media/`, `config.js`)
+- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `errors.js`, `property-row.js`, `media.js`, `export.js`, `manifest.json`, `sw.js`, `icons/`, `sample-media/`, `config.js`)
 - `app/config.example.js`, `.env.example` — how to point the PWA at Supabase
 - `supabase/schema.sql` — tables, RLS, invite functions, sample seed, storage policies
 - `supabase/migrations/20260919_photos_expenses_sample.sql` — incremental SQL if the older schema is already applied
