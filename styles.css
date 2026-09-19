@@ -35,6 +35,22 @@ h2 { margin-bottom: 5px; color: var(--teal-900); font-size: 1.3rem; letter-spaci
 h3 { margin-bottom: 4px; font-size: 1.05rem; }
 .muted { color: var(--muted); font-size: .9rem; line-height: 1.45; }
 .icon-button, .modal-close { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid var(--line); border-radius: 50%; color: var(--teal-800); background: var(--surface); font-size: 1.65rem; line-height: 1; box-shadow: 0 2px 7px rgba(0,0,0,.04); }
+#authView, #setupView { padding-bottom: 36px; }
+.contact-hint { margin-top: 12px !important; }
+.screen-center { display: grid; align-content: center; min-height: 100vh; text-align: center; }
+.auth-card { padding: 22px 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.auth-card h2 { margin-bottom: 8px; }
+.auth-card .muted { margin-bottom: 16px; }
+.auth-card .primary-button { width: 100%; }
+.auth-switch { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: .92rem; font-weight: 500; }
+.text-button { display: inline; padding: 0; border: 0; color: var(--teal-800); background: transparent; font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.invite-banner { margin-bottom: 14px; padding: 14px 16px; border: 1px solid #9fd0c8; border-radius: 14px; background: var(--teal-50); }
+.invite-banner p { margin: 0; color: var(--teal-900); font-size: .95rem; line-height: 1.45; }
+.member-list { margin-bottom: 16px; }
+.member-list strong { display: block; margin-bottom: 6px; color: var(--teal-900); }
+.member-list div { margin-bottom: 4px; }
+.invite-result { margin-top: 16px; padding-top: 4px; }
+.share-code { margin: 0 0 12px; padding: 12px; border-radius: 12px; background: var(--teal-50); color: var(--teal-900); font-size: 1.35rem; font-weight: 800; letter-spacing: .12em; text-align: center; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .section-heading > div { min-width: 0; }
 .section-heading .muted { margin-bottom: 0; }

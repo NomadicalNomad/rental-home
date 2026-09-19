@@ -1,9 +1,10 @@
-const CACHE_NAME = 'rental-home-shell-v1';
+const CACHE_NAME = 'rental-home-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './auth.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
@@ -18,7 +19,28 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Never cache config.js (project URL / anon key) or authenticated API calls (those are cross-origin).
+  if (url.pathname.endsWith('/config.js') || url.pathname.endsWith('config.js')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => new Response('/* missing config.js */', { headers: { 'Content-Type': 'text/javascript' } })));
+    return;
+  }
+
+  const networkFirst = url.pathname.endsWith('/') || /\.(?:html|js|css)$/.test(url.pathname);
+  if (networkFirst) {
+    event.respondWith(fetch(event.request).then(response => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html'))));
+    return;
+  }
+
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
     const copy = response.clone();
     caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
