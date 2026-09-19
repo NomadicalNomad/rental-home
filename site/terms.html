@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Marketing links: relative *.html / #anchors only. Never href="/site/...". -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -13,16 +14,20 @@
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="index.html">
-        <strong>RentManor</strong>
-        <span>Your properties. Your people.</span>
-      </a>
+      <div class="header-top">
+        <a class="brand" href="index.html">
+          <strong>RentManor</strong>
+          <span>Your properties. Your people.</span>
+        </a>
+        <div class="header-cta">
+          <a class="nav-signin" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+        </div>
+      </div>
       <nav class="nav" aria-label="Primary">
-        <a href="index.html">Home</a>
+        <a class="nav-home" href="index.html">Home</a>
         <a href="features.html">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
-        <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
       </nav>
     </div>
   </header>
@@ -37,7 +42,10 @@
       <p>RentManor is a tool for managing your own rental records. You are responsible for the accuracy of what you enter and for how you use contact actions (call, text, email).</p>
 
       <h2>Accounts</h2>
-      <p>Keep your password private. If you invite someone to your account, they can see that account’s properties. Don’t invite people you don’t trust with that information.</p>
+      <p>Keep your password private. Prefer <strong>Invite</strong> to share a portfolio. If you invite someone, they can view and edit that account’s properties. Only invite people you trust with tenant information.</p>
+
+      <h2>Your content</h2>
+      <p>You are responsible for the accuracy of records you enter and for how you use Call / Text / Email.</p>
 
       <h2>Acceptable use</h2>
       <p>Don’t use RentManor to break the law, harass anyone, or try to access another account’s data.</p>
@@ -47,7 +55,7 @@
 
       <h2>Changes</h2>
       <p>These terms may be updated. The date at the top will change when they do.</p>
-      <p><em>This page is a short product stub, not legal advice.</em></p>
+      <p><em>Short product notice — not legal advice.</em></p>
     </div>
   </main>
 
@@ -66,12 +74,6 @@
       <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
-  <script>
-    (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
-    })();
-  </script>
+  <script src="app-cta.js"></script>
 </body>
 </html>

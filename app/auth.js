@@ -10,6 +10,7 @@ let currentAccount = null;
 let currentMemberships = [];
 let authCallback = null;
 let started = false;
+let recoveryPending = false;
 
 export function hasSupabaseConfig() {
   const config = window.RENTAL_HOME_CONFIG || {};
@@ -65,6 +66,12 @@ export function friendlyError(error) {
   if (message.includes('email not confirmed') || message.includes('confirm')) {
     return 'Please check your email to finish creating your account, then sign in.';
   }
+  if (message.includes('rate') || message.includes('too many') || message.includes('over_email')) {
+    return 'Please wait a minute, then try again.';
+  }
+  if (message.includes('same password') || message.includes('should be different') || message.includes('different from the old')) {
+    return 'Please choose a password you haven’t used.';
+  }
   if (message.includes('valid email') || message.includes('unable to validate email')) {
     return 'Please enter a valid email address.';
   }
@@ -101,8 +108,16 @@ function captureInviteFromUrl() {
     sessionStorage.setItem(INVITE_STORAGE_KEY, token.toUpperCase());
     params.delete('invite');
     const query = params.toString();
-    const next = `${location.pathname}${query ? `?${query}` : ''}`;
-    history.replaceState({}, '', next);
+    let hash = location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+      if (hashParams.has('invite')) {
+        hashParams.delete('invite');
+        const leftover = hashParams.toString();
+        hash = leftover ? `#${leftover}` : '';
+      }
+    }
+    history.replaceState({}, '', `${location.pathname}${query ? `?${query}` : ''}${hash}`);
   }
 }
 
@@ -123,6 +138,58 @@ function setAuthError(message) {
   });
 }
 
+function setAuthSuccess(message) {
+  document.querySelectorAll('.js-auth-success').forEach(box => {
+    if (!message) {
+      box.hidden = true;
+      box.textContent = '';
+      return;
+    }
+    box.hidden = false;
+    box.textContent = message;
+  });
+}
+
+function isRecoveryHash() {
+  const blob = `${location.hash || ''}${location.search || ''}`;
+  return /type=recovery/i.test(blob);
+}
+
+function isAuthCallbackHash() {
+  const hash = location.hash || '';
+  return /access_token=|refresh_token=/i.test(hash);
+}
+
+export function appOriginUrl() {
+  const dir = location.pathname.replace(/index\.html$/i, '');
+  const withSlash = dir.endsWith('/') ? dir : `${dir}/`;
+  return `${location.origin}${withSlash}`;
+}
+
+function requestedAuthMode() {
+  if (isRecoveryHash()) return 'recovery';
+  if (isAuthCallbackHash()) return 'signin';
+  const params = new URLSearchParams(location.search);
+  const queryMode = (params.get('mode') || '').toLowerCase();
+  const rawHash = (location.hash || '').replace(/^#/, '').toLowerCase();
+  const hashHead = rawHash.split('&')[0].split('=')[0];
+  const hashParams = new URLSearchParams(rawHash.includes('=') ? rawHash : '');
+  const hashMode = (hashParams.get('mode') || hashHead || '').toLowerCase();
+  const mode = queryMode || hashMode;
+  if (mode === 'signup' || mode === 'sign-up') return 'signup';
+  if (mode === 'forgot' || mode === 'reset') return 'forgot';
+  if (mode === 'recovery') return 'recovery';
+  return 'signin';
+}
+
+function syncAuthHash(mode) {
+  if (isAuthCallbackHash() || isRecoveryHash()) return;
+  if (mode !== 'signup' && mode !== 'signin' && mode !== 'forgot') return;
+  const next = `#${mode}`;
+  if (location.hash.toLowerCase() === next) return;
+  history.replaceState({}, '', `${location.pathname}${location.search}${next}`);
+}
+
 function setBusy(button, busy, label) {
   if (!button) return;
   button.disabled = Boolean(busy);
@@ -137,11 +204,19 @@ export function showScreen(name) {
 }
 
 function showAuthMode(mode) {
-  const signIn = document.querySelector('#signInForm');
-  const signUp = document.querySelector('#signUpForm');
-  if (signIn) signIn.hidden = mode !== 'signin';
-  if (signUp) signUp.hidden = mode !== 'signup';
+  const forms = {
+    signin: '#signInForm',
+    signup: '#signUpForm',
+    forgot: '#forgotForm',
+    recovery: '#recoveryForm'
+  };
+  Object.entries(forms).forEach(([key, selector]) => {
+    const node = document.querySelector(selector);
+    if (node) node.hidden = key !== mode;
+  });
   setAuthError('');
+  if (mode !== 'forgot') setAuthSuccess('');
+  syncAuthHash(mode);
 }
 
 async function refreshInviteBanner() {
@@ -311,6 +386,18 @@ export async function signOut() {
   if (supabase) await supabase.auth.signOut();
 }
 
+export async function requestPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: appOriginUrl()
+  });
+  if (error) throw error;
+}
+
+export async function updatePassword(password) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function createInvite(email) {
   if (!currentAccount?.id) throw new Error('Not signed in');
   const data = await rpc('create_invite', {
@@ -363,6 +450,28 @@ function bindAuthForms() {
   document.querySelector('#showSignIn')?.addEventListener('click', event => {
     event.preventDefault();
     showAuthMode('signin');
+  });
+  document.querySelector('#showSignInFromForgot')?.addEventListener('click', event => {
+    event.preventDefault();
+    showAuthMode('signin');
+  });
+  document.querySelector('#showForgot')?.addEventListener('click', event => {
+    event.preventDefault();
+    const fromSignIn = document.querySelector('#signInForm input[name="email"]')?.value || '';
+    const forgotEmail = document.querySelector('#forgotForm input[name="email"]');
+    if (forgotEmail && fromSignIn && !forgotEmail.value) forgotEmail.value = fromSignIn;
+    showAuthMode('forgot');
+  });
+  document.querySelector('#cancelRecovery')?.addEventListener('click', async event => {
+    event.preventDefault();
+    recoveryPending = false;
+    await signOut();
+  });
+
+  window.addEventListener('hashchange', () => {
+    if (recoveryPending || isRecoveryHash() || isAuthCallbackHash()) return;
+    if (document.querySelector('#authView')?.hidden) return;
+    showAuthMode(requestedAuthMode());
   });
 
   document.querySelector('#signInForm')?.addEventListener('submit', async event => {
@@ -420,6 +529,70 @@ function bindAuthForms() {
       setBusy(submit, false, 'Create account');
     }
   });
+
+  document.querySelector('#forgotForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    const email = form.email.value.trim();
+    if (!email) {
+      setAuthError('Please enter your email.');
+      return;
+    }
+    setAuthError('');
+    setAuthSuccess('');
+    setBusy(submit, true, 'Sending…');
+    try {
+      await requestPasswordReset(email);
+      setAuthSuccess('Check your email for a link to reset your password.');
+    } catch (error) {
+      setAuthError(friendlyError(error));
+    } finally {
+      setBusy(submit, false, 'Send reset link');
+    }
+  });
+
+  document.querySelector('#recoveryForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    const password = form.password.value;
+    const confirm = form.confirm.value;
+    if (!password) {
+      setAuthError('Please enter a new password.');
+      return;
+    }
+    if (password !== confirm) {
+      setAuthError('Those passwords don’t match.');
+      return;
+    }
+    if (password.length < 6) {
+      setAuthError('Please use a password with at least 6 characters.');
+      return;
+    }
+    setAuthError('');
+    setBusy(submit, true, 'Saving…');
+    try {
+      await updatePassword(password);
+      recoveryPending = false;
+      history.replaceState({}, '', `${location.pathname}${location.search}`);
+      currentUser = (await supabase.auth.getSession()).data.session?.user || currentUser;
+      if (!currentUser) {
+        showAuthMode('signin');
+        setAuthSuccess('');
+        setAuthError('Your password is updated. Sign in with the new one.');
+        return;
+      }
+      showScreen('loading');
+      const { inviteWarning } = await establishAccount(currentUser);
+      showScreen('app');
+      await emitSignedIn(inviteWarning ? friendlyError(inviteWarning) : 'Your password is updated.');
+    } catch (error) {
+      setAuthError(friendlyError(error));
+    } finally {
+      setBusy(submit, false, 'Save new password');
+    }
+  });
 }
 
 export async function startAuth(callback) {
@@ -427,6 +600,7 @@ export async function startAuth(callback) {
   started = true;
   authCallback = callback;
   captureInviteFromUrl();
+  recoveryPending = isRecoveryHash();
 
   if (!hasSupabaseConfig()) {
     showScreen('setup');
@@ -447,12 +621,14 @@ export async function startAuth(callback) {
   }
 
   bindAuthForms();
-  showAuthMode('signin');
+  recoveryPending = recoveryPending || isRecoveryHash();
+  showAuthMode(recoveryPending ? 'recovery' : requestedAuthMode());
   await refreshInviteBanner();
 
   let sessionJob = Promise.resolve();
   const queueSession = (event, session) => {
-    if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') return;
+    if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+    if (event === 'PASSWORD_RECOVERY') recoveryPending = true;
     sessionJob = sessionJob.then(() => applySession(event, session)).catch(() => {});
   };
 
@@ -460,10 +636,19 @@ export async function startAuth(callback) {
     if (!session) {
       currentUser = null;
       currentAccount = null;
-      showAuthMode('signin');
+      recoveryPending = false;
+      const mode = event === 'SIGNED_OUT' ? 'signin' : requestedAuthMode();
+      showAuthMode(mode === 'recovery' ? 'signin' : mode);
       await refreshInviteBanner();
       showScreen('auth');
       await emitSignedOut();
+      return;
+    }
+    if (event === 'PASSWORD_RECOVERY' || recoveryPending || isRecoveryHash()) {
+      recoveryPending = true;
+      currentUser = session.user;
+      showAuthMode('recovery');
+      showScreen('auth');
       return;
     }
     if (event && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') return;

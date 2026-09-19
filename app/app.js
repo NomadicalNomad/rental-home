@@ -32,6 +32,7 @@ const backupPanel = document.querySelector('#backupPanel');
 const accountPanel = document.querySelector('#accountPanel');
 const invitePanel = document.querySelector('#invitePanel');
 const importPanel = document.querySelector('#importPanel');
+const deletePanel = document.querySelector('#deletePanel');
 const restoreInput = document.querySelector('#restoreInput');
 const toast = document.querySelector('#toast');
 const inviteButton = document.querySelector('#inviteButton');
@@ -221,10 +222,10 @@ function renderList() {
       </button>`).join('');
 }
 
-function contactButton(label, value, scheme, icon) {
-  if (!value) return `<span class="contact-button disabled" aria-disabled="true"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</span>`;
+function contactButton(label, value, scheme) {
+  if (!value) return `<span class="contact-button disabled" aria-disabled="true">${escapeHTML(label)} <span class="sr-only">unavailable</span></span>`;
   const href = scheme === 'mailto' ? `mailto:${encodeURIComponent(value)}` : `${scheme}:${scheme === 'tel' || scheme === 'sms' ? value.replace(/[^+\d]/g, '') : value}`;
-  return `<a class="contact-button" href="${escapeHTML(href)}"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</a>`;
+  return `<a class="contact-button" href="${escapeHTML(href)}">${escapeHTML(label)}</a>`;
 }
 
 function renderDetail(property) {
@@ -238,7 +239,7 @@ function renderDetail(property) {
         ${property.status === 'occupied' && property.tenantName ? `<p class="muted">Tenant: <strong>${escapeHTML(property.tenantName)}</strong></p>` : ''}
       </div>
       <div class="detail-grid">
-        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
+        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel')} ${contactButton('Text', property.phone, 'sms')} ${contactButton('Email', property.email, 'mailto')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
         ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
         ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
       </div>
@@ -320,15 +321,32 @@ async function submitForm(event) {
 
 async function deleteProperty() {
   const property = properties.find(item => item.id === editingId);
-  if (!property || !window.confirm(`Delete ${property.address}? This cannot be undone.`)) return;
+  if (!property) return;
+  const text = document.querySelector('#deleteConfirmText');
+  if (text) text.textContent = `${property.address} will be removed. This cannot be undone.`;
+  deletePanel.hidden = false;
+}
+
+async function confirmDeleteProperty() {
+  const property = properties.find(item => item.id === editingId);
+  if (!property) {
+    deletePanel.hidden = true;
+    return;
+  }
+  const confirmButton = document.querySelector('#confirmDeleteButton');
+  confirmButton.disabled = true;
   try {
     const { error } = await getSupabase().from('properties').delete().eq('id', property.id);
     if (error) throw error;
     await loadProperties();
+    deletePanel.hidden = true;
     showToast('Property deleted.');
     showView('list');
   } catch (error) {
+    deletePanel.hidden = true;
     showToast(friendlyError(error));
+  } finally {
+    confirmButton.disabled = false;
   }
 }
 
@@ -344,6 +362,7 @@ function closeModals() {
   accountPanel.hidden = true;
   invitePanel.hidden = true;
   importPanel.hidden = true;
+  deletePanel.hidden = true;
 }
 
 function downloadBackup() {
@@ -539,6 +558,7 @@ function bindUi() {
   }));
   form.addEventListener('submit', submitForm);
   deleteButton.addEventListener('click', deleteProperty);
+  document.querySelector('#confirmDeleteButton').addEventListener('click', confirmDeleteProperty);
   document.querySelector('#accountButton').addEventListener('click', openAccountMenu);
   document.querySelector('#backupButton').addEventListener('click', () => { accountPanel.hidden = true; backupPanel.hidden = false; });
   document.querySelector('#downloadButton').addEventListener('click', downloadBackup);
@@ -571,6 +591,7 @@ function bindUi() {
       if (action === 'close-backup') backupPanel.hidden = true;
       if (action === 'close-account') accountPanel.hidden = true;
       if (action === 'close-invite') invitePanel.hidden = true;
+      if (action === 'close-delete') deletePanel.hidden = true;
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
         importPanel.hidden = true;
@@ -583,6 +604,7 @@ function bindUi() {
     if (event.target === backupPanel) backupPanel.hidden = true;
     if (event.target === accountPanel) accountPanel.hidden = true;
     if (event.target === invitePanel) invitePanel.hidden = true;
+    if (event.target === deletePanel) deletePanel.hidden = true;
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();
       importPanel.hidden = true;

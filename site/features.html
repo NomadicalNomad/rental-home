@@ -1,10 +1,11 @@
 <!doctype html>
+<!-- Marketing links: relative *.html / #anchors only. Never href="/site/...". -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f766e">
-  <meta name="description" content="How RentManor works — four things. No property-management suite.">
+  <meta name="description" content="How RentManor works — the basics, then optional Home Screen install.">
   <title>How it works · RentManor</title>
   <link rel="icon" href="images/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="images/icon-192.png">
@@ -13,16 +14,20 @@
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="index.html">
-        <strong>RentManor</strong>
-        <span>Your properties. Your people.</span>
-      </a>
+      <div class="header-top">
+        <a class="brand" href="index.html">
+          <strong>RentManor</strong>
+          <span>Your properties. Your people.</span>
+        </a>
+        <div class="header-cta">
+          <a class="nav-signin" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+        </div>
+      </div>
       <nav class="nav" aria-label="Primary">
-        <a href="index.html">Home</a>
+        <a class="nav-home" href="index.html">Home</a>
         <a href="features.html" aria-current="page">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
-        <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
       </nav>
     </div>
   </header>
@@ -30,7 +35,7 @@
   <main class="page">
     <div class="wrap">
       <h1>How RentManor works</h1>
-      <p class="lead">Four things. No property-management suite.</p>
+      <p class="lead">The basics — then optional Home Screen install.</p>
 
       <div class="steps">
         <article class="step">
@@ -47,11 +52,11 @@
         </article>
         <article class="step">
           <h2>Invite when you share</h2>
-          <p>Need a partner or helper on the <em>same</em> properties? Invite them into your account. Other investors keep their own accounts — no mixing.</p>
+          <p>Need a partner or helper on the <em>same</em> properties? Invite them into your account after you sign in. They get their own login into <em>your</em> account. Other investors keep separate accounts — no mixing. Don’t share your password; use invite.</p>
         </article>
       </div>
 
-      <h2>Also useful</h2>
+      <h2>Optional</h2>
       <div class="card">
         <h2>Backup / restore</h2>
         <p>Export or import a JSON backup into the signed-in account when you need a spare copy.</p>
@@ -61,7 +66,7 @@
         <h2 id="a2hsHeading">Add RentManor to your iPhone</h2>
         <p>Takes about a minute. Use Safari — not Chrome.</p>
         <ol class="a2hs-list">
-          <li>Open <strong>rentmanor.com</strong> in <strong>Safari</strong> (not Chrome).</li>
+          <li>Open the app in <strong>Safari</strong> (not Chrome): <strong>https://nomadicalnomad.github.io/rental-home/app/</strong> (When <strong>app.rentmanor.com</strong> is live, use that instead.)</li>
           <li>Tap the <strong>Share</strong> button.</li>
           <li>Tap <strong>Add to Home Screen</strong>.</li>
           <li>Tap <strong>Add</strong>.</li>
@@ -69,8 +74,8 @@
         <p>After that, the RentManor icon sits on your home screen. Open it anytime — you’ll sign in like usual.</p>
         <p>On a computer, bookmark the site. Home Screen install is for iPhone Safari.</p>
         <div class="cta-row">
-          <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
-          <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Already have one? Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+          <a class="button secondary" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Already have one? Sign in</a>
         </div>
       </section>
     </div>
@@ -91,12 +96,6 @@
       <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
-  <script>
-    (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
-    })();
-  </script>
+  <script src="app-cta.js"></script>
 </body>
 </html>

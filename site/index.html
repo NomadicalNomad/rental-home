@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Marketing links: relative *.html / #anchors only. Never href="/site/...". -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -13,16 +14,19 @@
 <body>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="index.html">
-        <strong>RentManor</strong>
-        <span>Your properties. Your people.</span>
-      </a>
+      <div class="header-top">
+        <a class="brand" href="index.html">
+          <strong>RentManor</strong>
+          <span>Your properties. Your people.</span>
+        </a>
+        <div class="header-cta">
+          <a class="nav-signin" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+        </div>
+      </div>
       <nav class="nav" aria-label="Primary">
-        <a href="index.html" aria-current="page">Home</a>
         <a href="features.html">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
-        <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
       </nav>
     </div>
   </header>
@@ -34,8 +38,8 @@
         <p class="subhead">Your properties. Your people.</p>
         <p class="lead">Private rental portfolios for you and the people you trust.</p>
         <div class="cta-row">
-          <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
-          <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+          <a class="button secondary" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
         </div>
       </div>
     </section>
@@ -57,9 +61,9 @@
       </div>
       <p class="band">Clear on a phone. Clean enough for investor friends.</p>
       <div class="cta-row">
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Get started</a>
+        <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Get started</a>
       </div>
-      <p class="a2hs-nudge">Want it on your iPhone? See the steps under <a href="features.html#add-to-home-screen">How it works</a>.</p>
+      <p class="a2hs-nudge">Want it on your iPhone? <a href="features.html#add-to-home-screen">Add to Home Screen steps</a>.</p>
     </section>
   </main>
 
@@ -78,12 +82,6 @@
       <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
-  <script>
-    (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
-    })();
-  </script>
+  <script src="app-cta.js"></script>
 </body>
 </html>
