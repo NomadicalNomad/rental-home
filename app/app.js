@@ -465,7 +465,7 @@ function updateSampleChrome() {
   if (signIn) signIn.hidden = !sampleMode || signedIn;
   if (signUp) signUp.hidden = !sampleMode || signedIn;
   const heading = document.querySelector('#listHeading');
-  if (heading) heading.textContent = sampleMode ? 'Sample portfolio' : 'Your properties';
+  if (heading) heading.textContent = sampleMode ? 'Your properties · Sample' : 'Your properties';
 }
 
 function thumbMarkup(property, size = 'card') {
@@ -521,7 +521,7 @@ function renderList() {
         <h3>No properties yet.</h3>
         <p>Add your first rental.</p>
         <button class="primary-button js-write" type="button" data-action="add">+ Add home</button>
-        ${sampleMode ? '' : `<button class="text-button muted-link" type="button" data-action="view-sample">View a sample portfolio</button>
+        ${sampleMode ? '' : `<button class="text-button muted-link" type="button" data-action="view-sample">View sample portfolio</button>
         <p class="empty-help">See how RentManor looks with example homes. You can’t edit the sample.</p>`}
       </div>`;
     return;

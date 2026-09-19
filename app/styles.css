@@ -141,7 +141,7 @@ input:invalid:not(:placeholder-shown), textarea:invalid:not(:placeholder-shown) 
 body.sample-mode .js-write { display: none !important; }
 body.sample-mode .app-header { padding-top: 14px; }
 .sample-banner { position: sticky; top: 0; z-index: 6; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin: 0 -18px; padding: calc(10px + env(safe-area-inset-top)) 18px 12px; background: var(--teal-50); border-bottom: 1px solid #9fd0c8; color: var(--ink); }
-.sample-banner strong { display: block; color: var(--teal-900); font-size: .92rem; font-weight: 750; letter-spacing: 0; }
+.sample-banner strong { display: block; color: var(--teal-900); font-size: .82rem; font-weight: 800; letter-spacing: .04em; }
 .sample-banner p { margin: 4px 0 0; color: var(--ink); font-size: .86rem; line-height: 1.35; }
 .sample-banner-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex: 1 1 168px; }
 .sample-banner-actions .compact { white-space: nowrap; }
@@ -191,7 +191,7 @@ body.sample-mode .app-header { padding-top: 14px; }
 @media (prefers-reduced-motion: reduce) { .upload-bar span { animation: none; width: 100%; } }
 .danger-link { min-height: 44px; border: 0; color: var(--danger); background: transparent; font-weight: 750; }
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; align-items: end; padding: 18px; background: rgba(10, 35, 33, .4); }
-.modal { position: relative; width: 100%; max-width: 394px; margin: 0 auto; padding: 25px 20px 20px; border-radius: 20px 20px 10px 10px; background: white; box-shadow: 0 -8px 35px rgba(0,0,0,.15); }
+.modal { position: relative; width: 100%; max-width: 394px; margin: 0 auto; padding: 25px 20px calc(36px + env(safe-area-inset-bottom)); border-radius: 20px 20px 10px 10px; background: white; box-shadow: 0 -8px 35px rgba(0,0,0,.15); }
 .modal h2 { margin-bottom: 9px; }
 .modal p { margin-bottom: 20px; }
 .modal-close { position: absolute; top: 13px; right: 13px; width: 40px; height: 40px; border: 0; box-shadow: none; background: #f1f6f5; font-size: 1.4rem; }
