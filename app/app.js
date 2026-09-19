@@ -57,6 +57,7 @@ const invitePanel = document.querySelector('#invitePanel');
 const importPanel = document.querySelector('#importPanel');
 const photoSheet = document.querySelector('#photoSheet');
 const receiptSheet = document.querySelector('#receiptSheet');
+const confirmSheet = document.querySelector('#confirmSheet');
 const exportFormatSheet = document.querySelector('#exportFormatSheet');
 const exportReadySheet = document.querySelector('#exportReadySheet');
 const lightbox = document.querySelector('#lightbox');
@@ -87,6 +88,7 @@ let pendingReceiptPreview = '';
 let uploadBusy = false;
 let pendingExport = null;
 let exportPropertyId = null;
+let confirmResolve = null;
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
@@ -290,6 +292,31 @@ function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
 
+function homeOutline() {
+  return `<span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><path d="M10 30L32 12l22 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 28v22h32V28" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M28 50V36h8v14" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg></span>`;
+}
+
+function askConfirm({ title, message, confirmLabel = 'Confirm' }) {
+  return new Promise(resolve => {
+    if (confirmResolve) confirmResolve(false);
+    confirmResolve = resolve;
+    const titleEl = document.querySelector('#confirmTitle');
+    const messageEl = document.querySelector('#confirmMessage');
+    const yes = document.querySelector('#confirmYes');
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (yes) yes.textContent = confirmLabel;
+    if (confirmSheet) confirmSheet.hidden = false;
+  });
+}
+
+function settleConfirm(ok) {
+  if (confirmSheet) confirmSheet.hidden = true;
+  const resolve = confirmResolve;
+  confirmResolve = null;
+  if (resolve) resolve(Boolean(ok));
+}
+
 function currency(value) {
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount) : '';
@@ -398,12 +425,12 @@ function renderList() {
     }
     propertyList.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon" aria-hidden="true">⌂</div>
+        ${homeOutline()}
         <h3>No properties yet.</h3>
         <p>Add your first rental.</p>
-        <button class="primary-button js-write" type="button" data-action="add">＋ Add home</button>
-        <button class="text-button muted-link" type="button" data-action="view-sample">View sample portfolio</button>
-        <p class="empty-help">See how RentManor looks with example homes. You can’t edit the sample.</p>
+        <button class="primary-button js-write" type="button" data-action="add">+ Add home</button>
+        ${sampleMode ? '' : `<button class="text-button muted-link" type="button" data-action="view-sample">View sample</button>
+        <p class="empty-help">See how RentManor looks with example homes. You can’t edit the sample.</p>`}
       </div>`;
     return;
   }
@@ -824,7 +851,7 @@ async function removePropertyPhoto() {
     revokeObjectUrl(pendingPhotoPreview);
     pendingPhotoPreview = '';
     if (property) property.thumbnailPath = property.thumbnailPath || '';
-    if (property?.thumbnailPath && window.confirm('Remove this photo?')) {
+    if (property?.thumbnailPath && await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) {
       try {
         await removeAccountMedia(property.thumbnailPath);
         await getSupabase().from('properties').update({ thumbnail_path: null }).eq('id', property.id);
@@ -837,7 +864,7 @@ async function removePropertyPhoto() {
     renderFormPhoto(properties.find(item => item.id === property?.id) || property);
     return;
   }
-  if (!property?.thumbnailPath || !window.confirm('Remove this photo?')) return;
+  if (!property?.thumbnailPath || !await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) return;
   try {
     await removeAccountMedia(property.thumbnailPath);
     const { error } = await getSupabase().from('properties').update({ thumbnail_path: null }).eq('id', property.id);
@@ -915,9 +942,9 @@ function renderExpenseForm(property, expense) {
       <div class="form-actions sticky">
         <button class="primary-button" type="submit"${canWrite() ? '' : ' hidden'}>Save</button>
         <button class="secondary-button" type="button" data-action="back-to-detail" data-id="${escapeHTML(property.id)}">Cancel</button>
-        ${expense && canWrite() ? `<button class="danger-link js-write" type="button" data-action="delete-expense" data-expense-id="${escapeHTML(expense.id)}" data-property-id="${escapeHTML(property.id)}">Delete expense</button>` : ''}
       </div>
-    </form>`;
+    </form>
+    ${expense && canWrite() ? `<div class="danger-zone js-write"><button class="danger-link" type="button" data-action="delete-expense" data-expense-id="${escapeHTML(expense.id)}" data-property-id="${escapeHTML(property.id)}">Delete expense</button></div>` : ''}`;
   showView('expense');
   const expenseForm = document.querySelector('#expenseForm');
   if (expenseForm) expenseForm.addEventListener('submit', submitExpense);
@@ -1049,7 +1076,7 @@ async function removeCurrentReceipt() {
     pendingReceiptPreview = '';
   } else {
     const receipt = expense ? receiptForExpense(expense.id) : null;
-    if (!receipt || !window.confirm('Remove this receipt?')) return;
+    if (!receipt || !await askConfirm({ title: 'Remove receipt', message: 'Remove this receipt?', confirmLabel: 'Remove' })) return;
     try {
       await getSupabase().from('receipts').delete().eq('id', receipt.id);
       try { await removeAccountMedia(receipt.storagePath); } catch (_) { /* row gone */ }
@@ -1065,7 +1092,7 @@ async function removeCurrentReceipt() {
 
 async function deleteExpense(propertyId, expenseId) {
   if (!canWrite()) return;
-  if (!window.confirm('Delete this expense? This cannot be undone.')) return;
+  if (!await askConfirm({ title: 'Delete expense', message: 'Delete this expense? This cannot be undone.', confirmLabel: 'Delete expense' })) return;
   try {
     const receipts = receiptsByExpense.get(expenseId) || await loadReceipts(expenseId).catch(() => []);
     const { error } = await getSupabase().from('expenses').delete().eq('id', expenseId);
@@ -1124,6 +1151,7 @@ function closeModals() {
   importPanel.hidden = true;
   closeSheets();
   if (lightbox) lightbox.hidden = true;
+  if (confirmSheet && !confirmSheet.hidden) settleConfirm(false);
 }
 
 function downloadBackup() {
@@ -1338,6 +1366,7 @@ function bindUi() {
   document.querySelector('#exitSampleSignUp')?.addEventListener('click', () => leaveSample('signup'));
   document.querySelector('#exportShareButton')?.addEventListener('click', shareExportFile);
   document.querySelector('#exportSaveButton')?.addEventListener('click', saveExportFile);
+  document.querySelector('#confirmYes')?.addEventListener('click', () => settleConfirm(true));
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -1427,6 +1456,7 @@ function bindUi() {
       if (action === 'close-account') accountPanel.hidden = true;
       if (action === 'close-invite') invitePanel.hidden = true;
       if (action === 'close-photo-sheet' || action === 'close-receipt-sheet' || action === 'close-export') closeSheets();
+      if (action === 'close-confirm') settleConfirm(false);
       if (action === 'close-lightbox') lightbox.hidden = true;
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
@@ -1441,6 +1471,7 @@ function bindUi() {
     if (event.target === accountPanel) accountPanel.hidden = true;
     if (event.target === invitePanel) invitePanel.hidden = true;
     if (event.target === photoSheet || event.target === receiptSheet || event.target === exportFormatSheet || event.target === exportReadySheet) closeSheets();
+    if (event.target === confirmSheet) settleConfirm(false);
     if (event.target === lightbox) lightbox.hidden = true;
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();

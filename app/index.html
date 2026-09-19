@@ -116,7 +116,7 @@
             <h2 id="listHeading">Your properties</h2>
             <p id="propertyCount" class="muted"></p>
           </div>
-          <button class="primary-button compact js-write" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
+          <button class="primary-button compact js-write" id="addButton" type="button">+ Add home</button>
         </div>
         <label class="search-box" id="searchBox" for="searchInput">
           <span aria-hidden="true">⌕</span>
@@ -305,6 +305,15 @@
         <button class="sheet-row js-write" type="button" data-receipt="library">Choose photo</button>
         <button class="sheet-row js-write" type="button" data-receipt="pdf">Upload PDF</button>
         <button class="sheet-row" type="button" data-action="close-receipt-sheet">Cancel</button>
+      </section>
+    </div>
+
+    <div id="confirmSheet" class="modal-backdrop" hidden>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <h2 id="confirmTitle">Please confirm</h2>
+        <p id="confirmMessage" class="muted"></p>
+        <button class="sheet-row danger" id="confirmYes" type="button">Confirm</button>
+        <button class="sheet-row" type="button" data-action="close-confirm">Cancel</button>
       </section>
     </div>
 
