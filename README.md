@@ -27,7 +27,7 @@ Until DNS is live, GitHub Pages still works:
 
 It is okay if Mom and a helper both use the **same email and password**. That is the simplest way to share.
 
-To see how the app looks with example homes, tap **View sample portfolio** (or open `/#/sample`). The sample is read only. It is not copied into your account. Use **My account** to return.
+To see how the app looks with example homes, tap **View sample** (or open `/#/sample`). The sample is read only. It is not copied into your account. Use **Back to my account** to return.
 
 ## Invite / share
 
@@ -68,7 +68,7 @@ Anyone can open the shared demo without signing in:
 - App: https://app.rentmanor.com/#/sample
 - GitHub Pages: https://nomadicalnomad.github.io/rental-home/app/#/sample
 
-A sticky **SAMPLE · Read only** banner stays on list, detail, and expense. Writes are hidden. Exit with **My account** (signed in) or **Sign in** / **Create account**. There is no “load sample into my account” button. The demo homes also ship as local files so `#/sample` works before sample SQL is applied.
+A sticky **SAMPLE · Read only** banner stays on list, detail, and expense. Writes are hidden. Exit with **Back to my account** (signed in) or **Sign in** / **Create account**. There is no “load sample into my account” button. The demo homes also ship as local files so `#/sample` works before sample SQL is applied.
 
 ## Photos, expenses, receipts
 
