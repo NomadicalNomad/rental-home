@@ -68,6 +68,8 @@
       var appBase = 'https://app.rentmanor.com/';
       if (/\.github\.io$/i.test(location.hostname)) {
         appBase = 'https://nomadicalnomad.github.io/rental-home/app/';
+      } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        appBase = location.origin + '/app/';
       }
       document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = appBase; });
       document.querySelectorAll('[data-sample-cta]').forEach(function (a) { a.href = appBase + '#/sample'; });
