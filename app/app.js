@@ -222,10 +222,10 @@ function renderList() {
       </button>`).join('');
 }
 
-function contactButton(label, value, scheme, icon) {
-  if (!value) return `<span class="contact-button disabled" aria-disabled="true"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</span>`;
+function contactButton(label, value, scheme) {
+  if (!value) return `<span class="contact-button disabled" aria-disabled="true">${escapeHTML(label)} <span class="sr-only">unavailable</span></span>`;
   const href = scheme === 'mailto' ? `mailto:${encodeURIComponent(value)}` : `${scheme}:${scheme === 'tel' || scheme === 'sms' ? value.replace(/[^+\d]/g, '') : value}`;
-  return `<a class="contact-button" href="${escapeHTML(href)}"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</a>`;
+  return `<a class="contact-button" href="${escapeHTML(href)}">${escapeHTML(label)}</a>`;
 }
 
 function renderDetail(property) {
@@ -239,7 +239,7 @@ function renderDetail(property) {
         ${property.status === 'occupied' && property.tenantName ? `<p class="muted">Tenant: <strong>${escapeHTML(property.tenantName)}</strong></p>` : ''}
       </div>
       <div class="detail-grid">
-        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
+        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel')} ${contactButton('Text', property.phone, 'sms')} ${contactButton('Email', property.email, 'mailto')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
         ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
         ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
       </div>
