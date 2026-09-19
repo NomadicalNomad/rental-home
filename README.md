@@ -84,13 +84,13 @@ Photos and receipts live in the private `account-media` bucket:
 - Thumbnail: `{account_id}/properties/{property_id}/thumbnail` (+ extension)
 - Receipt: `{account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}` (+ extension)
 
-## Ops — run the photos/expenses SQL on live
+## Ops — photos/expenses SQL
 
-**Builder is applying this in parallel. Live personal Add home / photos / expenses will fail until it lands.**
+**Production has this applied** (`properties.thumbnail_path`, `expenses`, `receipts`, private `account-media`). Personal Add home is no longer blocked by a missing column.
 
-If the project already applied an older `supabase/schema.sql`, run `supabase/migrations/20260919_photos_expenses_sample.sql` in the Supabase SQL editor (safe to re-run; does not wipe personal accounts or auto-seed Folsom into them). New projects can paste the current `supabase/schema.sql` instead.
+Keep `supabase/migrations/20260919_photos_expenses_sample.sql` for any environment that still runs an older schema (safe to re-run; does not wipe personal accounts or auto-seed Folsom into them). New projects can paste the current `supabase/schema.sql` instead.
 
-That SQL adds `properties.thumbnail_path`, `expenses`, `receipts`, private `account-media`, and the shared sample account. Until it is applied, Add home without a photo still works (the app omits the empty thumbnail column). Saving a photo or expense needs the new columns. The app now shows “This app update needs a database update — contact support” (or the real PostgREST message) instead of a generic “Something went wrong.”
+If a later schema miss happens, the app shows “This app update needs a database update — contact support” or the real PostgREST `message` / `code` / `details` — never only “Something went wrong.”
 
 ## How to configure (Damon)
 

@@ -126,7 +126,7 @@ export function friendlyError(error) {
   if (hay.includes('sample homes cannot be changed') || hay.includes('sample is view only')) {
     return 'Sample homes cannot be changed.';
   }
-  if (isMissingColumnError(error, 'thumbnail_path') || hay.includes('thumbnail_path')) {
+  if (isMissingColumnError(error, 'thumbnail_path')) {
     return DATABASE_UPDATE_NEEDED;
   }
   if (isSchemaSetupError(error)) {

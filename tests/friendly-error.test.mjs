@@ -36,6 +36,16 @@ test('friendlyError never returns only the generic string when message/code/deta
   assert.match(leftoverText, /XX000/);
   assert.notEqual(leftoverText, GENERIC_ERROR);
 
+  const thumbConstraint = {
+    code: '23502',
+    message: 'null value in column "thumbnail_path" violates not-null constraint'
+  };
+  const thumbText = friendlyError(thumbConstraint);
+  assert.match(thumbText, /thumbnail_path/);
+  assert.match(thumbText, /23502/);
+  assert.notEqual(thumbText, GENERIC_ERROR);
+  assert.notEqual(thumbText, DATABASE_UPDATE_NEEDED);
+
   const named = new Error('assertWritable is not defined');
   const namedText = friendlyError(named);
   assert.match(namedText, /assertWritable is not defined/);
