@@ -74,6 +74,7 @@ On a property you own:
 
 - Add, replace, or remove one primary photo (camera or library). It shows on the list and the detail screen.
 - Track expenses (date, amount, category, notes) with a simple year total.
+- Export that property’s expenses as CSV or PDF, then **Share…** or **Save file**. Receipt files are not included.
 - Attach one receipt per expense — camera, photo library, or PDF — then view or remove it.
 
 Photos and receipts live in the private `account-media` bucket:

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentmanor-shell-v4';
+const CACHE_NAME = 'rentmanor-shell-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './app.js',
   './auth.js',
   './media.js',
+  './export.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'

@@ -29,6 +29,7 @@ import {
   resolveMediaUrl,
   revokeObjectUrl
 } from './media.js';
+import { expensesToCsv, expensesToPdf, exportFileName, exportTotals } from './export.js';
 
 const LEGACY_KEY = 'rental-home-data-v1';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -56,6 +57,8 @@ const invitePanel = document.querySelector('#invitePanel');
 const importPanel = document.querySelector('#importPanel');
 const photoSheet = document.querySelector('#photoSheet');
 const receiptSheet = document.querySelector('#receiptSheet');
+const exportFormatSheet = document.querySelector('#exportFormatSheet');
+const exportReadySheet = document.querySelector('#exportReadySheet');
 const lightbox = document.querySelector('#lightbox');
 const restoreInput = document.querySelector('#restoreInput');
 const toast = document.querySelector('#toast');
@@ -82,6 +85,8 @@ let photoContext = 'detail';
 let pendingReceiptFile = null;
 let pendingReceiptPreview = '';
 let uploadBusy = false;
+let pendingExport = null;
+let exportPropertyId = null;
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
@@ -483,7 +488,10 @@ async function renderDetail(property) {
             <h3>Expenses</h3>
             <p class="muted">${expenses.length ? escapeHTML(expenseSummary(expenses)) : 'No expenses yet.'}</p>
           </div>
-          ${write ? `<button class="primary-button compact js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">＋ Add</button>` : ''}
+          <div class="heading-actions">
+            ${expenses.length ? `<button class="secondary-button compact" type="button" data-action="export-expenses" data-id="${escapeHTML(property.id)}">Export</button>` : ''}
+            ${write ? `<button class="primary-button compact js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">＋ Add</button>` : ''}
+          </div>
         </div>
         ${expenses.length
           ? `<div class="expense-list">${expenses.map(expenseRow).join('')}</div>`
@@ -657,6 +665,115 @@ function openPhotoSheet(property, context = 'detail') {
 function closeSheets() {
   if (photoSheet) photoSheet.hidden = true;
   if (receiptSheet) receiptSheet.hidden = true;
+  closeExportSheets();
+}
+
+function closeExportSheets() {
+  if (exportFormatSheet) exportFormatSheet.hidden = true;
+  if (exportReadySheet) exportReadySheet.hidden = true;
+  setExportFormatBusy(false);
+}
+
+function setExportFormatBusy(busy) {
+  exportFormatSheet?.querySelectorAll('[data-export-format]').forEach(button => {
+    button.disabled = busy;
+  });
+}
+
+function showExportError(boxId, visible) {
+  const box = document.querySelector(boxId);
+  if (!box) return;
+  box.hidden = !visible;
+  if (visible) box.textContent = 'Couldn’t create the file. Try again.';
+}
+
+function openExportSheet(property) {
+  const expenses = expensesByProperty.get(property.id) || [];
+  if (!expenses.length) return;
+  exportPropertyId = property.id;
+  pendingExport = null;
+  showExportError('#exportFormatError', false);
+  showExportError('#exportReadyError', false);
+  setExportFormatBusy(false);
+  if (exportReadySheet) exportReadySheet.hidden = true;
+  if (exportFormatSheet) exportFormatSheet.hidden = false;
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function saveExportFile() {
+  if (!pendingExport) return;
+  downloadBlob(pendingExport.blob, pendingExport.name);
+}
+
+async function shareExportFile() {
+  if (!pendingExport) return;
+  const file = pendingExport.file;
+  if (navigator.canShare && file && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'RentManor expenses',
+        text: pendingExport.name
+      });
+      return;
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+  }
+  saveExportFile();
+}
+
+async function generateExpenseExport(format) {
+  const property = properties.find(item => item.id === exportPropertyId);
+  const expenses = expensesByProperty.get(exportPropertyId) || [];
+  const formatError = document.querySelector('#exportFormatError');
+  if (formatError) formatError.hidden = true;
+  if (!property || !expenses.length) return;
+  setExportFormatBusy(true);
+  if (exportFormatSheet) exportFormatSheet.hidden = true;
+  if (exportReadySheet) exportReadySheet.hidden = false;
+  const progress = document.querySelector('#exportProgress');
+  const share = document.querySelector('#exportShareButton');
+  const save = document.querySelector('#exportSaveButton');
+  if (progress) progress.hidden = false;
+  if (share) share.disabled = true;
+  if (save) save.disabled = true;
+  showExportError('#exportReadyError', false);
+  try {
+    const ext = format === 'pdf' ? 'pdf' : 'csv';
+    const name = exportFileName(property.address, ext, { sample: sampleMode });
+    const type = ext === 'pdf' ? 'application/pdf' : 'text/csv';
+    const payload = ext === 'pdf'
+      ? expensesToPdf({ address: property.address, list: expenses })
+      : expensesToCsv(expenses);
+    const blob = new Blob([payload], { type });
+    const file = new File([blob], name, { type });
+    const { count, total } = exportTotals(expenses);
+    pendingExport = { blob, file, name };
+    const fileNameEl = document.querySelector('#exportFileName');
+    const summaryEl = document.querySelector('#exportReadySummary');
+    if (fileNameEl) fileNameEl.textContent = name;
+    if (summaryEl) summaryEl.textContent = `${count} ${count === 1 ? 'expense' : 'expenses'} · ${money(total)}`;
+    if (share) share.disabled = false;
+    if (save) save.disabled = false;
+  } catch (_) {
+    if (exportReadySheet) exportReadySheet.hidden = true;
+    if (exportFormatSheet) exportFormatSheet.hidden = false;
+    showExportError('#exportFormatError', true);
+  } finally {
+    if (progress) progress.hidden = true;
+    setExportFormatBusy(false);
+  }
 }
 
 async function applyPickedPhoto(file) {
@@ -1219,6 +1336,8 @@ function bindUi() {
   document.querySelector('#exitSampleAccount')?.addEventListener('click', () => leaveSample('account'));
   document.querySelector('#exitSampleSignIn')?.addEventListener('click', () => leaveSample('signin'));
   document.querySelector('#exitSampleSignUp')?.addEventListener('click', () => leaveSample('signup'));
+  document.querySelector('#exportShareButton')?.addEventListener('click', shareExportFile);
+  document.querySelector('#exportSaveButton')?.addEventListener('click', saveExportFile);
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -1262,6 +1381,11 @@ function bindUi() {
       if (choice === 'pdf') document.querySelector('#receiptPdfInput').click();
       return;
     }
+    const exportChoice = event.target.closest('[data-export-format]');
+    if (exportChoice && !exportChoice.disabled) {
+      generateExpenseExport(exportChoice.dataset.exportFormat);
+      return;
+    }
 
     const actionTarget = event.target.closest('[data-action]');
     if (actionTarget) {
@@ -1282,6 +1406,10 @@ function bindUi() {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
         if (property?.thumbnailPath) viewMedia(property.thumbnailPath, property.address);
       }
+      if (action === 'export-expenses') {
+        const property = properties.find(item => item.id === actionTarget.dataset.id);
+        if (property) openExportSheet(property);
+      }
       if (action === 'add-expense') {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
         if (property) openExpense(property);
@@ -1298,7 +1426,7 @@ function bindUi() {
       if (action === 'close-backup') backupPanel.hidden = true;
       if (action === 'close-account') accountPanel.hidden = true;
       if (action === 'close-invite') invitePanel.hidden = true;
-      if (action === 'close-photo-sheet' || action === 'close-receipt-sheet') closeSheets();
+      if (action === 'close-photo-sheet' || action === 'close-receipt-sheet' || action === 'close-export') closeSheets();
       if (action === 'close-lightbox') lightbox.hidden = true;
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
@@ -1312,7 +1440,7 @@ function bindUi() {
     if (event.target === backupPanel) backupPanel.hidden = true;
     if (event.target === accountPanel) accountPanel.hidden = true;
     if (event.target === invitePanel) invitePanel.hidden = true;
-    if (event.target === photoSheet || event.target === receiptSheet) closeSheets();
+    if (event.target === photoSheet || event.target === receiptSheet || event.target === exportFormatSheet || event.target === exportReadySheet) closeSheets();
     if (event.target === lightbox) lightbox.hidden = true;
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();

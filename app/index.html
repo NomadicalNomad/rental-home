@@ -266,6 +266,38 @@
       </section>
     </div>
 
+    <div id="exportFormatSheet" class="modal-backdrop" hidden>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="exportFormatTitle">
+        <h2 id="exportFormatTitle">Export expenses</h2>
+        <p class="muted">Includes this home’s expenses (date, amount, category, notes).</p>
+        <div id="exportFormatError" class="form-error" role="alert" hidden></div>
+        <button class="sheet-row sheet-choice" type="button" data-export-format="csv">
+          <strong>CSV spreadsheet</strong>
+          <small>Opens in Numbers or Excel</small>
+        </button>
+        <button class="sheet-row sheet-choice" type="button" data-export-format="pdf">
+          <strong>PDF document</strong>
+          <small>Easy to email or print</small>
+        </button>
+        <button class="sheet-row" type="button" data-action="close-export">Cancel</button>
+      </section>
+    </div>
+
+    <div id="exportReadySheet" class="modal-backdrop" hidden>
+      <section class="sheet ready-card" role="dialog" aria-modal="true" aria-labelledby="exportReadyTitle">
+        <h2 id="exportReadyTitle">Ready</h2>
+        <p class="filename-chip" id="exportFileName"></p>
+        <p class="muted" id="exportReadySummary"></p>
+        <div id="exportReadyError" class="form-error" role="alert" hidden></div>
+        <div class="upload-bar" id="exportProgress" hidden><span></span></div>
+        <div class="backup-actions">
+          <button class="primary-button" id="exportShareButton" type="button">Share…</button>
+          <button class="secondary-button" id="exportSaveButton" type="button">Save file</button>
+          <button class="text-button" type="button" data-action="close-export">Done</button>
+        </div>
+      </section>
+    </div>
+
     <div id="receiptSheet" class="modal-backdrop" hidden>
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="receiptSheetTitle">
         <h2 id="receiptSheetTitle">Add receipt</h2>
