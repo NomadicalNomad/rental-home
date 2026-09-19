@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f766e">
-  <meta name="description" content="Terms of use for RentManor â€” a short product stub, not legal advice.">
-  <title>Terms of use Â· RentManor</title>
-  <link rel="icon" href="images/favicon-32.png" type="image/png">
-  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <meta name="description" content="Terms of use for RentManor — a short product stub, not legal advice.">
+  <title>Terms of use · RentManor</title>
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
       <nav class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="features.html">How it works</a>
-        <a href="for-whom.html">Who itâ€™s for</a>
+        <a href="for-whom.html">Who it’s for</a>
         <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
         <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
       </nav>
@@ -37,10 +37,10 @@
       <p>RentManor is a tool for managing your own rental records. You are responsible for the accuracy of what you enter and for how you use contact actions (call, text, email).</p>
 
       <h2>Accounts</h2>
-      <p>Keep your password private. If you invite someone to your account, they can see that accountâ€™s properties. Donâ€™t invite people you donâ€™t trust with that information.</p>
+      <p>Keep your password private. If you invite someone to your account, they can see that account’s properties. Don’t invite people you don’t trust with that information.</p>
 
       <h2>Acceptable use</h2>
-      <p>Donâ€™t use RentManor to break the law, harass anyone, or try to access another accountâ€™s data.</p>
+      <p>Don’t use RentManor to break the law, harass anyone, or try to access another account’s data.</p>
 
       <h2>No warranties</h2>
       <p>The service is provided as-is for personal and small-portfolio use. It is not a substitute for professional property-management, legal, or tax advice.</p>
@@ -59,23 +59,18 @@
       </div>
       <ul class="footer-links">
         <li><a href="features.html">How it works</a></li>
-        <li><a href="for-whom.html">Who itâ€™s for</a></li>
+        <li><a href="for-whom.html">Who it’s for</a></li>
         <li><a href="privacy.html">Privacy</a></li>
         <li><a href="terms.html">Terms</a></li>
       </ul>
-      <p class="tiny">Â© 2026 RentManor. Built for small portfolios and the people you trust.</p>
+      <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
   <script>
     (function () {
-      var appBase = 'https://app.rentmanor.com/';
-      if (/\.github\.io$/i.test(location.hostname)) {
-        appBase = 'https://nomadicalnomad.github.io/rental-home/app/';
-      } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        appBase = location.origin + '/app/';
-      }
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = appBase; });
-      document.querySelectorAll('[data-sample-cta]').forEach(function (a) { a.href = appBase + '#/sample'; });
+      if (!/\.github\.io$/i.test(location.hostname)) return;
+      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
     })();
   </script>
 </body>
