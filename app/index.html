@@ -313,7 +313,7 @@
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="photoSheetTitle">
         <h2 id="photoSheetTitle">Property photo</h2>
         <button class="sheet-row" id="viewPhotoButton" type="button" data-photo="view" hidden>View photo</button>
-        <button class="sheet-row js-write" id="makePrimaryButton" type="button" data-photo="primary" hidden>Use as list photo</button>
+        <button class="sheet-row js-write" id="makePrimaryButton" type="button" data-photo="primary" hidden>Make primary</button>
         <button class="sheet-row js-write" type="button" data-photo="camera">Take photo</button>
         <button class="sheet-row js-write" type="button" data-photo="library">Choose from library</button>
         <button class="sheet-row danger js-write" id="removePhotoButton" type="button" data-photo="remove" hidden>Remove photo</button>
@@ -368,6 +368,7 @@
         <h2 id="confirmTitle">Please confirm</h2>
         <p id="confirmMessage" class="muted"></p>
         <button class="sheet-row danger" id="confirmYes" type="button">Confirm</button>
+        <button class="sheet-row" id="confirmDiscard" type="button" hidden>Discard</button>
         <button class="sheet-row" type="button" data-action="close-confirm">Cancel</button>
       </section>
     </div>
@@ -375,13 +376,17 @@
     <div id="lightbox" class="lightbox" hidden>
       <button class="lightbox-close" type="button" data-action="close-lightbox">Close</button>
       <img id="lightboxImage" alt="">
+      <div id="lightboxActions" class="lightbox-actions js-write" hidden>
+        <button class="secondary-button compact" type="button" data-action="lightbox-primary">Make primary</button>
+        <button class="danger-link" type="button" data-action="lightbox-remove">Remove</button>
+      </div>
     </div>
 
     <div id="backupPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
         <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
         <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Backup saves property text data. Photos and receipts stay in your account online. Restoring replaces the properties in your signed-in account, not other people’s.</p>
+        <p class="muted">Backup saves property text data. Photos, receipts, lease, and correspondence stay in your account online. Restoring replaces the properties in this signed-in account, not other people’s.</p>
         <div class="backup-actions">
           <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
           <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>

@@ -34,11 +34,10 @@ import {
 import { isMissingColumnError, isSchemaSetupError } from './errors.js';
 import { toPropertyRow, withoutOptionalPropertyColumns, withoutThumbnailPath } from './property-row.js';
 import {
-  appliancesHtml,
+  detailHeaderHtml,
   detailTabsHtml,
-  galleryHtml,
   hasCurrentTenant,
-  propertyFactsHtml,
+  propertyTabHtml,
   tenantTabHtml
 } from './property-tabs.js';
 import {
@@ -110,6 +109,7 @@ let expensePropertyId = null;
 let detailTab = 'property';
 let detailPropertyId = null;
 let tenantEditorOpen = false;
+let detailDirty = false;
 let galleryPhotoId = null;
 let filePickerContext = 'receipt';
 let toastTimer;
@@ -717,25 +717,119 @@ function homeOutline() {
   return `<span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><path d="M10 30L32 12l22 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 28v22h32V28" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M28 50V36h8v14" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg></span>`;
 }
 
-function askConfirm({ title, message, confirmLabel = 'Confirm' }) {
+function askConfirm({ title, message, confirmLabel = 'Confirm', discardLabel = '' }) {
   return new Promise(resolve => {
     if (confirmResolve) confirmResolve(false);
     confirmResolve = resolve;
     const titleEl = document.querySelector('#confirmTitle');
     const messageEl = document.querySelector('#confirmMessage');
     const yes = document.querySelector('#confirmYes');
+    const discard = document.querySelector('#confirmDiscard');
     if (titleEl) titleEl.textContent = title;
     if (messageEl) messageEl.textContent = message;
-    if (yes) yes.textContent = confirmLabel;
+    if (yes) {
+      yes.textContent = confirmLabel;
+      yes.classList.toggle('danger', !discardLabel);
+    }
+    if (discard) {
+      discard.hidden = !discardLabel;
+      discard.textContent = discardLabel || 'Discard';
+    }
     if (confirmSheet) confirmSheet.hidden = false;
   });
 }
 
 function settleConfirm(ok) {
   if (confirmSheet) confirmSheet.hidden = true;
+  const discard = document.querySelector('#confirmDiscard');
+  if (discard) discard.hidden = true;
   const resolve = confirmResolve;
   confirmResolve = null;
-  if (resolve) resolve(Boolean(ok));
+  if (resolve) resolve(ok);
+}
+
+function activeDetailForm() {
+  return document.querySelector('#propertyDetailForm') || document.querySelector('#tenantForm');
+}
+
+function isDetailDirty() {
+  return detailDirty || activeDetailForm()?.dataset.dirty === '1';
+}
+
+function setDetailDirty(dirty) {
+  detailDirty = dirty;
+  const form = activeDetailForm();
+  if (form) form.dataset.dirty = dirty ? '1' : '';
+  const bar = document.querySelector('#detailSaveBar');
+  if (bar) bar.hidden = !dirty;
+}
+
+function captureDetailDraft() {
+  const form = activeDetailForm();
+  if (!form || !isDetailDirty()) return null;
+  return { tab: detailTab, values: Object.fromEntries(new FormData(form).entries()) };
+}
+
+function restoreDetailDraft(draft) {
+  if (!draft || draft.tab !== detailTab) return;
+  const form = activeDetailForm();
+  if (!form) return;
+  Object.entries(draft.values).forEach(([key, value]) => {
+    const field = form.elements[key];
+    if (!field) return;
+    if (field instanceof RadioNodeList) {
+      [...field].forEach(input => { input.checked = input.value === value; });
+    } else if (field.type === 'radio') {
+      const match = form.querySelector(`[name="${key}"][value="${value}"]`);
+      if (match) match.checked = true;
+    } else {
+      field.value = value;
+    }
+  });
+  setDetailDirty(true);
+}
+
+function bindDetailDirty() {
+  const form = activeDetailForm();
+  if (!form) return;
+  const mark = () => setDetailDirty(true);
+  form.addEventListener('input', mark);
+  form.addEventListener('change', mark);
+}
+
+function syncStickyOffset() {
+  const banner = document.querySelector('#sampleBanner');
+  const height = sampleMode && banner && !banner.hidden ? Math.ceil(banner.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--detail-sticky-top', `${height}px`);
+}
+
+async function confirmLeaveDirtyTab() {
+  if (!isDetailDirty()) return 'ok';
+  const result = await askConfirm({
+    title: 'Save changes?',
+    message: 'You have unsaved edits on this tab.',
+    confirmLabel: 'Save',
+    discardLabel: 'Discard'
+  });
+  if (result === true) {
+    const saved = await saveActiveDetailForm();
+    return saved ? 'ok' : 'cancel';
+  }
+  if (result === 'discard') {
+    setDetailDirty(false);
+    return 'ok';
+  }
+  return 'cancel';
+}
+
+async function switchDetailTab(next) {
+  const tab = DETAIL_TABS_SAFE.has(next) ? next : 'property';
+  if (tab === detailTab) return;
+  if (await confirmLeaveDirtyTab() !== 'ok') return;
+  detailTab = tab;
+  if (detailTab !== 'tenant') tenantEditorOpen = false;
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (property) renderDetail(property);
 }
 
 function currency(value) {
@@ -782,6 +876,7 @@ function showView(view) {
 
 function updateSampleChrome() {
   document.body.classList.toggle('sample-mode', sampleMode);
+  syncStickyOffset();
   const banner = document.querySelector('#sampleBanner');
   const signedIn = Boolean(getUser() && getAccount());
   if (banner) banner.hidden = !sampleMode;
@@ -947,21 +1042,26 @@ function expensesPanelHtml(property, expenses, write) {
 
 const DETAIL_TABS_SAFE = new Set(['property', 'tenant', 'expenses']);
 
-function propertyTabPanel(property, write) {
+function propertyTabPanel(property, write, { expenses = [], tenant = null } = {}) {
   const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
   const appliances = appliancesByProperty.get(property.id) || [];
-  return `
-    <div class="detail-grid">
-      ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
-      ${propertyFactsHtml(property)}
-      ${galleryHtml({ photos, write, sample: sampleMode })}
-      ${appliancesHtml({ appliances, write })}
-    </div>
-    ${write ? `<div class="detail-actions js-write"><button class="primary-button" type="button" data-action="edit" data-id="${escapeHTML(property.id)}">Edit property</button><button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>` : `<div class="detail-actions"><button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>`}`;
+  return propertyTabHtml({
+    property,
+    photos,
+    appliances,
+    expenses,
+    tenant,
+    write,
+    sample: sampleMode,
+    expenseSummary: expenses.length
+      ? `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'} · ${money(expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))}`
+      : ''
+  });
 }
 
 async function renderDetail(property) {
   if (!property) { showView('list'); return; }
+  const draft = captureDetailDraft();
   detailPropertyId = property.id;
   let expenses = expensesByProperty.get(property.id);
   if (!expenses) {
@@ -983,7 +1083,7 @@ async function renderDetail(property) {
   const cover = photos.find(item => item.isPrimary) || photos[0];
   const heroPath = cover?.storagePath || property.thumbnailPath || '';
   const heroProperty = { ...property, thumbnailPath: heroPath };
-  const heroAction = write ? 'add-gallery-photo' : (heroPath ? 'view-hero' : '');
+  const heroAction = heroPath ? 'view-hero' : (write ? 'add-gallery-photo' : '');
   const tenant = tenantByProperty.get(property.id);
   const files = tenant?.id ? (tenantFilesByTenant.get(tenant.id) || []) : [];
   const tab = DETAIL_TABS_SAFE.has(detailTab) ? detailTab : 'property';
@@ -993,7 +1093,7 @@ async function renderDetail(property) {
   } else if (tab === 'expenses') {
     panel = expensesPanelHtml(property, expenses, write);
   } else {
-    panel = propertyTabPanel(property, write);
+    panel = propertyTabPanel(property, write, { expenses, tenant });
   }
   detailView.innerHTML = `
       <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
@@ -1001,20 +1101,22 @@ async function renderDetail(property) {
         ${thumbMarkup(heroProperty, 'hero')}
         <span class="upload-bar" hidden><span></span></span>
       </button>
-      <div class="detail-header">
-        <span class="badge ${property.status}">${property.status === 'occupied' ? 'Occupied' : 'Vacant'}</span>
-        <h2 id="detailHeading">${escapeHTML(property.address)}</h2>
-        <p class="detail-address">${escapeHTML(propertyLocation(property))}</p>
-        ${hasCurrentTenant(tenant) ? `<p class="muted">Tenant: <strong>${escapeHTML(tenant.name || 'Tenant')}</strong></p>` : ''}
+      <div class="detail-sticky">
+        ${detailHeaderHtml(property, { location: propertyLocation(property), rent: currency(property.rent) })}
+        ${detailTabsHtml(tab)}
       </div>
-      ${detailTabsHtml(tab)}
-      <div class="detail-panel" role="tabpanel" aria-labelledby="tab-${tab}">${panel}</div>`;
+      <div class="detail-panel" role="tabpanel" id="panel-${tab}" aria-labelledby="tab-${tab}">${panel}</div>`;
   showView('detail');
+  syncStickyOffset();
   hydrateThumbs(detailView);
   const applianceForm = document.querySelector('#applianceForm');
   if (applianceForm) applianceForm.addEventListener('submit', submitAppliance);
+  const propertyForm = document.querySelector('#propertyDetailForm');
+  if (propertyForm) propertyForm.addEventListener('submit', submitPropertyDetail);
   const tenantForm = document.querySelector('#tenantForm');
   if (tenantForm) tenantForm.addEventListener('submit', submitTenant);
+  bindDetailDirty();
+  restoreDetailDraft(draft);
 }
 
 function renderFormPhoto(property) {
@@ -1084,6 +1186,63 @@ function readForm() {
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return { error: 'Please enter a valid email address.' };
   if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
   return { data: { ...data, state: data.state.toUpperCase() } };
+}
+
+function readPropertyDetail(formEl) {
+  const data = Object.fromEntries(new FormData(formEl).entries());
+  Object.keys(data).forEach(key => { if (typeof data[key] === 'string') data[key] = data[key].trim(); });
+  if (!data.address || !data.city || !data.state || !data.zip) return { error: 'Please fill in the required property fields.' };
+  if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
+  if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
+  return { data: { ...data, state: data.state.toUpperCase() } };
+}
+
+function showPropertyDetailError(message) {
+  const box = document.querySelector('#propertyDetailError');
+  if (!box) {
+    showToast(message);
+    return;
+  }
+  box.textContent = message;
+  box.hidden = false;
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function submitPropertyDetail(event) {
+  event.preventDefault();
+  return savePropertyDetail();
+}
+
+async function savePropertyDetail() {
+  if (!canWrite()) return false;
+  const formEl = document.querySelector('#propertyDetailForm');
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (!formEl || !property) return false;
+  const result = readPropertyDetail(formEl);
+  if (result.error) { showPropertyDetailError(result.error); return false; }
+  const submit = formEl.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const saved = { ...property, ...result.data, updatedAt: new Date().toISOString() };
+    await writePropertyRows([toRow(saved)], { existingId: saved.id });
+    await loadProperties();
+    setDetailDirty(false);
+    showToast('Property saved.');
+    const next = properties.find(item => item.id === saved.id) || saved;
+    renderDetail(next);
+    return true;
+  } catch (error) {
+    showPropertyDetailError(friendlyError(error));
+    return false;
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function saveActiveDetailForm() {
+  if (detailTab === 'tenant') return saveTenantFromForm();
+  if (detailTab === 'property') return savePropertyDetail();
+  return true;
 }
 
 async function savePropertyPhoto(property) {
@@ -1183,10 +1342,10 @@ async function collectPropertyMediaPaths(property) {
   return [...new Set(paths)];
 }
 
-async function deleteProperty() {
+async function deleteProperty(propertyId = editingId) {
   if (!canWrite()) return;
-  const property = properties.find(item => item.id === editingId);
-  if (!property || !window.confirm(`Delete ${property.address}? This cannot be undone.`)) return;
+  const property = properties.find(item => item.id === propertyId);
+  if (!property || !await askConfirm({ title: 'Delete property', message: `Delete ${property.address}? This cannot be undone.`, confirmLabel: 'Delete property' })) return;
   try {
     const paths = await collectPropertyMediaPaths(property);
     const { error } = await getSupabase().from('properties').delete().eq('id', property.id);
@@ -1432,6 +1591,7 @@ async function removePropertyPhoto() {
   }
   const photos = photosByProperty.get(property?.id) || [];
   const selected = galleryPhotoId ? photos.find(item => item.id === galleryPhotoId) : (photos.find(item => item.isPrimary) || photos[0]);
+  if (lightbox) lightbox.hidden = true;
   if (!property || !selected || !await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) return;
   try {
     if (!String(selected.id).startsWith('thumb-')) {
@@ -1457,6 +1617,7 @@ async function makePhotoPrimary() {
   const photos = photosByProperty.get(property?.id) || [];
   const selected = photos.find(item => item.id === galleryPhotoId);
   closeSheets();
+  if (lightbox) lightbox.hidden = true;
   if (!property || !selected) return;
   try {
     const supabase = getSupabase();
@@ -1734,7 +1895,7 @@ async function deleteExpense(propertyId, expenseId) {
   }
 }
 
-async function viewMedia(path, alt = '') {
+async function viewMedia(path, alt = '', { gallery = false } = {}) {
   const url = await resolveMediaUrl(path);
   if (!url) {
     showToast('Could not open that file.');
@@ -1749,6 +1910,8 @@ async function viewMedia(path, alt = '') {
     image.src = url;
     image.alt = alt || '';
   }
+  const actions = document.querySelector('#lightboxActions');
+  if (actions) actions.hidden = !(gallery && canWrite());
   lightbox.hidden = false;
 }
 
@@ -1794,10 +1957,14 @@ async function refreshPropertyAfterTenant(propertyId) {
 
 async function submitTenant(event) {
   event.preventDefault();
-  if (!canWrite()) return;
+  await saveTenantFromForm();
+}
+
+async function saveTenantFromForm() {
+  if (!canWrite()) return false;
   const property = properties.find(item => item.id === detailPropertyId);
-  if (!property) return;
-  const formEl = event.currentTarget;
+  const formEl = document.querySelector('#tenantForm');
+  if (!property || !formEl) return false;
   const errorBox = document.querySelector('#tenantError');
   const name = formEl.name.value.trim();
   const phone = formEl.phone.value.trim();
@@ -1805,14 +1972,14 @@ async function submitTenant(event) {
   const notes = formEl.notes.value.trim().slice(0, 1000);
   if (!name) {
     if (errorBox) { errorBox.hidden = false; errorBox.textContent = 'Please add the tenant name.'; }
-    return;
+    return false;
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     if (errorBox) { errorBox.hidden = false; errorBox.textContent = 'Please enter a valid email address.'; }
-    return;
+    return false;
   }
   const submit = formEl.querySelector('button[type="submit"]');
-  submit.disabled = true;
+  if (submit) submit.disabled = true;
   try {
     const supabase = getSupabase();
     let existing = tenantByProperty.get(property.id);
@@ -1841,21 +2008,24 @@ async function submitTenant(event) {
     }).eq('id', property.id);
     if (error) throw error;
     tenantEditorOpen = false;
+    setDetailDirty(false);
     showToast('Tenant saved.');
     await refreshPropertyAfterTenant(property.id);
+    return true;
   } catch (error) {
     if (errorBox) {
       errorBox.hidden = false;
       errorBox.textContent = friendlyError(error);
     } else showToast(friendlyError(error));
+    return false;
   } finally {
-    submit.disabled = false;
+    if (submit) submit.disabled = false;
   }
 }
 
 async function markPropertyVacant(propertyId) {
-  if (!canWrite()) return;
-  if (!await askConfirm({ title: 'Mark vacant', message: 'Remove this tenant? The home will show as vacant, and lease copies will be deleted.', confirmLabel: 'Mark vacant' })) return;
+  if (!canWrite()) return false;
+  if (!await askConfirm({ title: 'Remove tenant', message: 'Remove tenant info and files for this home?', confirmLabel: 'Remove tenant' })) return false;
   try {
     const supabase = getSupabase();
     const tenant = tenantByProperty.get(propertyId) || await loadTenant(propertyId);
@@ -1877,8 +2047,10 @@ async function markPropertyVacant(propertyId) {
     tenantEditorOpen = false;
     showToast('Home is vacant.');
     await refreshPropertyAfterTenant(propertyId);
+    return true;
   } catch (error) {
     showToast(friendlyError(error));
+    return false;
   }
 }
 
@@ -2249,7 +2421,7 @@ function bindUi() {
     renderList();
   }));
   form.addEventListener('submit', submitForm);
-  deleteButton.addEventListener('click', deleteProperty);
+  deleteButton.addEventListener('click', () => deleteProperty());
   document.querySelector('#accountButton').addEventListener('click', openAccountMenu);
   document.querySelector('#backupButton').addEventListener('click', () => { accountPanel.hidden = true; backupPanel.hidden = false; });
   document.querySelector('#downloadButton').addEventListener('click', downloadBackup);
@@ -2275,6 +2447,7 @@ function bindUi() {
   document.querySelector('#exportShareButton')?.addEventListener('click', shareExportFile);
   document.querySelector('#exportSaveButton')?.addEventListener('click', saveExportFile);
   document.querySelector('#confirmYes')?.addEventListener('click', () => settleConfirm(true));
+  document.querySelector('#confirmDiscard')?.addEventListener('click', () => settleConfirm('discard'));
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -2301,7 +2474,7 @@ function bindUi() {
     if (file) applyPickedReceipt(file);
   });
 
-  document.addEventListener('click', event => {
+  document.addEventListener('click', async event => {
     const photoChoice = event.target.closest('[data-photo]');
     if (photoChoice) {
       const choice = photoChoice.dataset.photo;
@@ -2332,6 +2505,8 @@ function bindUi() {
       if (action === 'add') { if (canWrite()) openForm(); }
       if (action === 'edit') { if (canWrite()) openForm(properties.find(property => property.id === actionTarget.dataset.id)); }
       if (action === 'back-to-list' || action === 'cancel-form') {
+        if (currentView === 'detail' && await confirmLeaveDirtyTab() !== 'ok') return;
+        setDetailDirty(false);
         if (sampleMode) goSample();
         else showView('list');
       }
@@ -2346,19 +2521,49 @@ function bindUi() {
       if (action === 'clear-filters') { searchInput.value = ''; activeFilter = 'all'; document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all')); renderList(); }
       if (action === 'view-sample') enterSampleRoute();
       if (action === 'detail-tab') {
-        detailTab = DETAIL_TABS_SAFE.has(actionTarget.dataset.tab) ? actionTarget.dataset.tab : 'property';
-        if (detailTab !== 'tenant') tenantEditorOpen = false;
-        const property = properties.find(item => item.id === detailPropertyId);
-        if (property) renderDetail(property);
+        await switchDetailTab(actionTarget.dataset.tab);
       }
+      if (action === 'goto-tenant') await switchDetailTab('tenant');
+      if (action === 'goto-expenses') await switchDetailTab('expenses');
+      if (action === 'set-status-occupied') {
+        const property = properties.find(item => item.id === detailPropertyId);
+        if (!property || property.status === 'occupied') return;
+        if (await confirmLeaveDirtyTab() !== 'ok') {
+          renderDetail(property);
+          return;
+        }
+        tenantEditorOpen = true;
+        detailTab = 'tenant';
+        renderDetail(property);
+      }
+      if (action === 'set-status-vacant') {
+        const property = properties.find(item => item.id === detailPropertyId);
+        const tenant = tenantByProperty.get(detailPropertyId);
+        if (!property || (property.status === 'vacant' && !hasCurrentTenant(tenant))) return;
+        if (await confirmLeaveDirtyTab() !== 'ok') {
+          renderDetail(property);
+          return;
+        }
+        const removed = await markPropertyVacant(property.id);
+        if (!removed) renderDetail(properties.find(item => item.id === property.id) || property);
+      }
+      if (action === 'delete-property') deleteProperty(actionTarget.dataset.id || detailPropertyId);
       if (action === 'add-gallery-photo') {
         const property = properties.find(item => item.id === (actionTarget.dataset.id || detailPropertyId));
         if (property) openPhotoSheet(property, 'gallery');
       }
       if (action === 'gallery-photo') {
         const property = properties.find(item => item.id === detailPropertyId);
-        if (property) openPhotoSheet(property, 'gallery', actionTarget.dataset.photoId);
+        const photos = photosByProperty.get(property?.id) || thumbnailAsPhotos(property);
+        const selected = photos.find(item => item.id === actionTarget.dataset.photoId);
+        if (property && selected) {
+          galleryPhotoId = selected.id;
+          editingId = property.id;
+          viewMedia(selected.storagePath, property.address, { gallery: true });
+        }
       }
+      if (action === 'lightbox-primary') makePhotoPrimary();
+      if (action === 'lightbox-remove') removePropertyPhoto();
       if (action === 'add-tenant') {
         tenantEditorOpen = true;
         detailTab = 'tenant';
@@ -2408,10 +2613,14 @@ function bindUi() {
       if (action === 'form-photo') openPhotoSheet(properties.find(item => item.id === editingId) || { id: editingId, thumbnailPath: pendingPhotoPreview || '' }, 'form');
       if (action === 'view-hero') {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
-        const photos = photosByProperty.get(property?.id) || [];
+        const photos = photosByProperty.get(property?.id) || thumbnailAsPhotos(property);
         const cover = photos.find(item => item.isPrimary) || photos[0];
         const path = cover?.storagePath || property?.thumbnailPath;
-        if (path) viewMedia(path, property.address);
+        if (path) {
+          galleryPhotoId = cover?.id || null;
+          if (property) editingId = property.id;
+          viewMedia(path, property.address, { gallery: Boolean(cover) });
+        }
       }
       if (action === 'export-expenses') {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
@@ -2445,7 +2654,11 @@ function bindUi() {
       if (action === 'close-invite') invitePanel.hidden = true;
       if (action === 'close-photo-sheet' || action === 'close-receipt-sheet' || action === 'close-export') closeSheets();
       if (action === 'close-confirm') settleConfirm(false);
-      if (action === 'close-lightbox') lightbox.hidden = true;
+      if (action === 'close-lightbox') {
+        lightbox.hidden = true;
+        const actions = document.querySelector('#lightboxActions');
+        if (actions) actions.hidden = true;
+      }
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
         importPanel.hidden = true;
@@ -2457,6 +2670,7 @@ function bindUi() {
     if (card) {
       detailTab = 'property';
       tenantEditorOpen = false;
+      setDetailDirty(false);
       const property = properties.find(item => item.id === card.dataset.id);
       if (property && sampleMode) goSample(property.id);
       else if (property) renderDetail(property);
@@ -2466,7 +2680,11 @@ function bindUi() {
     if (event.target === invitePanel) invitePanel.hidden = true;
     if (event.target === photoSheet || event.target === receiptSheet || event.target === exportFormatSheet || event.target === exportReadySheet) closeSheets();
     if (event.target === confirmSheet) settleConfirm(false);
-    if (event.target === lightbox) lightbox.hidden = true;
+    if (event.target === lightbox) {
+      lightbox.hidden = true;
+      const actions = document.querySelector('#lightboxActions');
+      if (actions) actions.hidden = true;
+    }
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();
       importPanel.hidden = true;
@@ -2496,6 +2714,7 @@ function resetLocalState() {
   detailTab = 'property';
   detailPropertyId = null;
   tenantEditorOpen = false;
+  detailDirty = false;
   galleryPhotoId = null;
   searchInput.value = '';
   document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));

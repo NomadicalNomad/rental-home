@@ -19,8 +19,11 @@ import {
 } from '../app/media.js';
 import {
   DETAIL_TABS,
+  detailHeaderHtml,
   detailTabsHtml,
+  galleryHtml,
   hasCurrentTenant,
+  propertyTabHtml,
   tenantTabHtml,
   vacantTenantHtml
 } from '../app/property-tabs.js';
@@ -56,18 +59,81 @@ test('sample occupied homes have tenant + lease demo; vacant homes do not invent
 
 test('vacant tenant tab is an empty state with no fake contact', () => {
   const empty = vacantTenantHtml({ write: false });
-  assert.match(empty, /No tenant right now/);
+  assert.match(empty, /No tenant yet/);
+  assert.match(empty, /Add who lives here when this home is occupied/);
   assert.doesNotMatch(empty, /Maria|Alex|555-/);
   const occupied = tenantTabHtml({
-    property: { id: 'p1' },
+    property: { id: 'p1', status: 'occupied' },
     tenant: sampleTenants()[0],
     files: sampleTenantFiles(),
     write: false,
     editing: false
   });
   assert.match(occupied, /Maria Hernandez/);
-  assert.match(occupied, /Lease/);
-  assert.match(occupied, /Correspondence/);
+  assert.match(occupied, /Lease agreement/);
+  assert.match(occupied, /Letters &amp; emails/);
+  assert.doesNotMatch(occupied, />Correspondence</);
+});
+
+test('property tab groups Basics, Utilities, Trash, Appliances, and Photos', () => {
+  const home = samplePortfolio()[0];
+  const html = propertyTabHtml({
+    property: {
+      ...home,
+      propertyType: home.property_type,
+      yearBuilt: home.year_built,
+      utilityElectric: home.utility_electric,
+      utilityGas: home.utility_gas,
+      utilityWater: home.utility_water,
+      utilityNotes: home.utility_notes,
+      trashSchedule: home.trash_schedule,
+      trashNotes: home.trash_notes
+    },
+    photos: samplePhotos().filter(item => item.propertyId === home.id),
+    appliances: sampleAppliances().filter(item => item.propertyId === home.id),
+    expenses: [{ amount: 84 }],
+    tenant: sampleTenants()[0],
+    write: false,
+    sample: true,
+    expenseSummary: '2 expenses · $504'
+  });
+  assert.match(html, /Basics/);
+  assert.match(html, /Utilities/);
+  assert.match(html, /Trash/);
+  assert.match(html, /Appliances/);
+  assert.match(html, /Photos/);
+  assert.match(html, /Primary photo shows on your list/);
+  assert.match(html, /gallery-star/);
+  assert.doesNotMatch(html, /Edit property/);
+  assert.doesNotMatch(html, />Expenses</);
+});
+
+test('sticky address chrome and 3-segment tabs use selected fill, not underline-only', () => {
+  const html = detailHeaderHtml({ address: '1124 Iron Point Road', status: 'occupied' }, { location: 'Folsom, CA 95630', rent: '$2,450' });
+  assert.match(html, /1124 Iron Point Road/);
+  assert.match(html, /Folsom, CA 95630/);
+  assert.match(html, /Occupied/);
+  assert.match(html, /\$2,450\/mo/);
+  const tabs = detailTabsHtml('property');
+  assert.match(tabs, /role="tablist"/);
+  assert.match(tabs, /aria-selected="true"[^>]*data-tab="property"|data-tab="property"[^>]*aria-selected="true"/);
+});
+
+test('gallery primary tile is marked for the list thumbnail', () => {
+  const html = galleryHtml({
+    photos: samplePhotos().filter(item => item.propertyId === '10000000-0000-4000-8000-000000000001'),
+    write: false,
+    sample: true
+  });
+  assert.match(html, /Primary/);
+  assert.match(html, /★/);
+});
+
+test('index confirm sheet offers Save / Discard / Cancel for dirty tabs', () => {
+  const html = readFileSync(join(root, 'app/index.html'), 'utf8');
+  assert.match(html, /id="confirmDiscard"/);
+  assert.match(html, /id="lightboxActions"/);
+  assert.match(html, /Make primary/);
 });
 
 test('storage paths follow the Structure freeze', () => {
@@ -94,5 +160,7 @@ test('SQL and PWA keep account isolation and one tenant per property', () => {
   }
   assert.match(appJs, /function assertWritable/);
   assert.match(appJs, /detail-tab/);
+  assert.match(appJs, /Save changes\?/);
+  assert.match(appJs, /confirmLeaveDirtyTab/);
   assert.doesNotMatch(appJs, /function seedProperties/);
 });
