@@ -3,6 +3,12 @@
 #   rentmanor.com (+ www → apex) → site/
 #   app.rentmanor.com             → app/
 #
+# Powered-by badge: Netlify injects `/.netlify/scripts/hud?variant=public` after
+# </html> (creates #nl-badge-frame / #nl-hud-frame). [[headers]] cannot strip it.
+# Official off-switch is Netlify UI → Project configuration → General →
+# Powered by Netlify badge. App dismisses the HUD via localStorage + CSS hide
+# + 64px sheet padding so Account → Sign out stays tappable on a phone.
+#
 # Netlify Pretty URLs / canonical rewriting may turn relative site links into
 # absolute /site/... paths. Those must NOT go through the catch-all
 # rentmanor.com/* → /site/:splat (that would become /site/site/...).

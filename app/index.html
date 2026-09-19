@@ -18,6 +18,14 @@
       supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoY3d5eGpodWF5a3RyZGRvZHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4MzIzMjksImV4cCI6MjEwNTQwODMyOX0.KaZg12T0MWDB16Iy9i25vKhQ84XEA8qJfoGhRjsbmNA'
     };
   </script>
+  <script>
+    // Netlify injects /.netlify/scripts/hud after </html> (Powered-by badge).
+    // The HUD script skips render when this key is "hidden". [[headers]] cannot strip the inject.
+    try {
+      localStorage.setItem('nl-hud:public:v1', 'hidden');
+      localStorage.setItem('nl-hud:owner-private:v1', 'hidden');
+    } catch (_) { /* private mode / blocked storage */ }
+  </script>
 </head>
 <body>
   <div id="loadingView" class="app-shell screen-center" hidden>
@@ -114,13 +122,13 @@
           </div>
           <button class="primary-button compact" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
         </div>
-        <label class="search-box" for="searchInput">
+        <label class="search-box" id="searchBox" for="searchInput" hidden>
           <span aria-hidden="true">⌕</span>
           <span class="sr-only">Search properties</span>
           <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
           <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
         </label>
-        <div class="filter-row" aria-label="Filter properties">
+        <div class="filter-row" id="filterRow" aria-label="Filter properties" hidden>
           <button class="filter-button active" type="button" data-filter="all">All</button>
           <button class="filter-button" type="button" data-filter="occupied">Occupied</button>
           <button class="filter-button" type="button" data-filter="vacant">Vacant</button>

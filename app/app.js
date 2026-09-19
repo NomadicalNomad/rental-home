@@ -35,6 +35,8 @@ const formView = document.querySelector('#formView');
 const propertyList = document.querySelector('#propertyList');
 const propertyCount = document.querySelector('#propertyCount');
 const searchInput = document.querySelector('#searchInput');
+const searchBox = document.querySelector('#searchBox');
+const filterRow = document.querySelector('#filterRow');
 const clearSearch = document.querySelector('#clearSearch');
 const form = document.querySelector('#propertyForm');
 const formError = document.querySelector('#formError');
@@ -221,9 +223,52 @@ function showView(view) {
   app.focus({ preventScroll: true });
 }
 
+function updateListTools() {
+  const show = properties.length > 0;
+  if (searchBox) searchBox.hidden = !show;
+  if (filterRow) filterRow.hidden = !show;
+}
+
+function isNetlifyHudNode(node) {
+  if (!node || node.nodeType !== 1) return false;
+  const id = node.id || '';
+  if (id === 'nl-hud-frame' || id === 'nl-badge-frame' || id === 'netlify-badge') return true;
+  if (node.tagName === 'IFRAME') {
+    const src = node.getAttribute('src') || '';
+    const srcdoc = node.getAttribute('srcdoc') || '';
+    return src.includes('netlify') || srcdoc.includes('netlify');
+  }
+  return false;
+}
+
+function neutralizeNetlifyBadge() {
+  try {
+    localStorage.setItem('nl-hud:public:v1', 'hidden');
+    localStorage.setItem('nl-hud:owner-private:v1', 'hidden');
+  } catch (_) { /* ignore */ }
+  document.querySelectorAll('#nl-hud-frame, #nl-badge-frame, #netlify-badge, iframe[src*="netlify"]').forEach(node => node.remove());
+}
+
+function watchNetlifyBadge() {
+  neutralizeNetlifyBadge();
+  if (typeof MutationObserver !== 'function') return;
+  const hudWatch = new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (isNetlifyHudNode(node) || node.querySelector?.('#nl-hud-frame, #nl-badge-frame, #netlify-badge, iframe[src*="netlify"]')) {
+          neutralizeNetlifyBadge();
+          return;
+        }
+      }
+    }
+  });
+  hudWatch.observe(document.documentElement, { childList: true, subtree: true });
+}
+
 function renderList() {
   const query = searchInput.value.trim().toLowerCase();
   clearSearch.hidden = !query;
+  updateListTools();
   const matches = properties.filter(property => {
     const inFilter = activeFilter === 'all' || property.status === activeFilter;
     const searchable = `${property.address} ${property.city} ${property.state} ${property.zip} ${property.tenantName}`.toLowerCase();
@@ -513,6 +558,7 @@ async function showSamplePortfolio() {
     showView('list');
   } catch (error) {
     showToast(friendlyError(error));
+    updateListTools();
     propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Could not load sample</h3><p>${escapeHTML(friendlyError(error))}</p><button class="secondary-button" type="button" data-action="leave-sample">Leave sample</button></div>`;
   }
 }
@@ -628,6 +674,7 @@ async function copyInviteLink() {
 function bindUi() {
   if (ready) return;
   ready = true;
+  watchNetlifyBadge();
   document.querySelector('#addButton').addEventListener('click', () => openForm());
   searchInput.addEventListener('input', renderList);
   clearSearch.addEventListener('click', () => { searchInput.value = ''; renderList(); searchInput.focus(); });
@@ -709,6 +756,7 @@ function resetLocalState() {
   document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));
   propertyList.innerHTML = '';
   propertyCount.textContent = '';
+  updateListTools();
 }
 
 startAuth(async ({ status, notice }) => {
@@ -740,6 +788,7 @@ startAuth(async ({ status, notice }) => {
     if (notice) showToast(notice);
   } catch (error) {
     showToast(friendlyError(error));
+    updateListTools();
     propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Could not load homes</h3><p>${escapeHTML(friendlyError(error))}</p></div>`;
   }
 });
