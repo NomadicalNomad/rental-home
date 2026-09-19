@@ -1,5 +1,13 @@
 /* RentManor — per-account property manager (Supabase-backed). */
 import {
+  canMutateAccount,
+  isSampleHash,
+  rowsForAccount,
+  scopedAccountId,
+  shouldInjectDemoProperties,
+  sampleWriteError
+} from './account-scope.js';
+import {
   startAuth,
   getSupabase,
   getUser,
@@ -11,7 +19,9 @@ import {
   listMembers,
   markAccountSeeded,
   replaceAccountProperties,
-  friendlyError
+  friendlyError,
+  showScreen,
+  showAuthMode
 } from './auth.js';
 
 const LEGACY_KEY = 'rental-home-data-v1';
@@ -44,6 +54,7 @@ let editingId = null;
 let toastTimer;
 let importMode = 'offer';
 let ready = false;
+let sampleMode = false;
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
@@ -59,13 +70,14 @@ function offeredKey() {
   return account ? `rental-home-legacy-offered:${account.id}` : 'rental-home-legacy-offered';
 }
 
-function seedProperties() {
-  return [
-    { address: '1124 Iron Point Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied', tenantName: 'Maria Hernandez', phone: '(916) 555-0148', email: 'maria.h@example.com', rent: '2450', notes: 'Renewal conversation in October.' },
-    { address: '704 Blue Ravine Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'vacant', tenantName: '', phone: '', email: '', rent: '2200', notes: 'Fresh paint completed in the living room.' },
-    { address: '1538 East Bidwell Street', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied', tenantName: 'James Wilson', phone: '(916) 555-0196', email: 'james.wilson@example.com', rent: '2750', notes: 'Two-car garage; gardener included.' },
-    { address: '889 Sibley Street', city: 'Folsom', state: 'CA', zip: '95630', status: 'vacant', tenantName: '', phone: '', email: '', rent: '1950', notes: '' }
-  ].map(property => ({ ...property, id: makeId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+function activeAccountId() {
+  return scopedAccountId({ sampleMode, accountId: getAccount()?.id || null });
+}
+
+function assertWritable() {
+  if (!canMutateAccount({ sampleMode, accountId: getAccount()?.id || null })) {
+    throw sampleWriteError();
+  }
 }
 
 function cleanProperty(value, index = 0) {
@@ -110,6 +122,7 @@ function fromRow(row) {
 }
 
 function toRow(property) {
+  assertWritable();
   const account = getAccount();
   return {
     id: property.id,
@@ -157,14 +170,21 @@ function readBackupFile(text) {
 
 async function loadProperties() {
   const supabase = getSupabase();
-  const account = getAccount();
+  const accountId = activeAccountId();
+  if (!supabase || !accountId) {
+    properties = [];
+    return;
+  }
   const { data, error } = await supabase
     .from('properties')
     .select('*')
-    .eq('account_id', account.id)
+    .eq('account_id', accountId)
     .order('updated_at', { ascending: false });
   if (error) throw error;
-  properties = (data || []).map(fromRow);
+  properties = rowsForAccount(data || [], accountId).map(fromRow);
+  if (shouldInjectDemoProperties({ account: getAccount(), properties, sampleMode })) {
+    properties = [];
+  }
 }
 
 async function insertProperties(list) {
@@ -209,7 +229,10 @@ function renderList() {
 
   if (!matches.length) {
     const hasProperties = properties.length > 0;
-    propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">${hasProperties ? '⌕' : '⌂'}</div><h3>${hasProperties ? 'No homes found' : 'No properties yet'}</h3><p>${hasProperties ? 'Try a different search or filter.' : 'Add your first rental.'}</p>${hasProperties ? '<button class="secondary-button" type="button" data-action="clear-filters">Clear search</button>' : '<button class="primary-button" type="button" data-action="add">Add a home</button>'}</div>`;
+    const emptyPrimary = sampleMode
+      ? '<button class="secondary-button" type="button" data-action="leave-sample">Leave sample</button>'
+      : '<button class="primary-button" type="button" data-action="add">Add a home</button><button class="secondary-button" type="button" data-action="view-sample">View sample</button>';
+    propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">${hasProperties ? '⌕' : '⌂'}</div><h3>${hasProperties ? 'No homes found' : (sampleMode ? 'Sample homes are not available yet' : 'No properties yet')}</h3><p>${hasProperties ? 'Try a different search or filter.' : (sampleMode ? 'The shared sample has not been set up in this project.' : 'Add your first rental. Nobody else’s homes are copied in.')}</p>${hasProperties ? '<button class="secondary-button" type="button" data-action="clear-filters">Clear search</button>' : emptyPrimary}</div>`;
     return;
   }
 
@@ -242,11 +265,15 @@ function renderDetail(property) {
         ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
         ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
       </div>
-      <div class="detail-actions"><button class="primary-button" type="button" data-action="edit" data-id="${escapeHTML(property.id)}">Edit property</button><button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>`;
+      <div class="detail-actions">${sampleMode ? '' : `<button class="primary-button" type="button" data-action="edit" data-id="${escapeHTML(property.id)}">Edit property</button>`}<button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>`;
   showView('detail');
 }
 
 function openForm(property = null) {
+  if (sampleMode) {
+    showToast('Sample homes cannot be changed.');
+    return;
+  }
   editingId = property?.id || null;
   form.reset();
   formError.hidden = true;
@@ -290,6 +317,7 @@ function readForm() {
 
 async function submitForm(event) {
   event.preventDefault();
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); return; }
   const result = readForm();
   if (result.error) { showFormError(result.error); return; }
   const now = new Date().toISOString();
@@ -319,6 +347,7 @@ async function submitForm(event) {
 }
 
 async function deleteProperty() {
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); return; }
   const property = properties.find(item => item.id === editingId);
   if (!property || !window.confirm(`Delete ${property.address}? This cannot be undone.`)) return;
   try {
@@ -362,6 +391,7 @@ function downloadBackup() {
 }
 
 async function handleRestore(event) {
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); event.target.value = ''; return; }
   const file = event.target.files[0];
   event.target.value = '';
   if (!file) return;
@@ -408,6 +438,7 @@ function openImportPanel(mode) {
 }
 
 async function importLegacyProperties() {
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); return; }
   const legacy = getLegacyProperties();
   if (!legacy.length) return;
   try {
@@ -423,28 +454,91 @@ async function importLegacyProperties() {
   }
 }
 
-async function maybeSeedSampleData() {
-  const account = getAccount();
-  if (!account || account.seeded || properties.length) return;
-  try {
-    await insertProperties(seedProperties());
-    await markAccountSeeded();
-    await loadProperties();
-  } catch (error) {
-    showToast(friendlyError(error));
-  }
-}
-
 async function afterPropertiesReady() {
   updateLegacyButton();
   const legacy = getLegacyProperties();
   const alreadyOffered = Boolean(localStorage.getItem(offeredKey()));
-  if (legacy.length && !alreadyOffered && !properties.length) {
+  if (!sampleMode && legacy.length && !alreadyOffered && !properties.length) {
     openImportPanel('offer');
     return;
   }
-  await maybeSeedSampleData();
   showView('list');
+}
+
+function updateSampleChrome() {
+  const banner = document.querySelector('#sampleBanner');
+  const addButton = document.querySelector('#addButton');
+  const accountButton = document.querySelector('#accountButton');
+  const listHeading = document.querySelector('#listHeading');
+  const sampleCreate = document.querySelector('#sampleCreateButton');
+  if (banner) banner.hidden = !sampleMode;
+  if (addButton) addButton.hidden = sampleMode;
+  if (accountButton) accountButton.hidden = sampleMode;
+  if (listHeading) listHeading.textContent = sampleMode ? 'Sample properties' : 'Your properties';
+  if (sampleCreate) {
+    sampleCreate.textContent = getUser() ? 'Back to my properties' : 'Create an account';
+    sampleCreate.dataset.action = getUser() ? 'leave-sample' : 'sample-create';
+  }
+}
+
+function enterSampleHash() {
+  if (!isSampleHash(location.hash)) {
+    location.hash = '/sample';
+    return;
+  }
+  void showSamplePortfolio();
+}
+
+function leaveSampleHash() {
+  if (isSampleHash(location.hash)) {
+    history.replaceState({}, '', `${location.pathname}${location.search}`);
+  }
+  sampleMode = false;
+  updateSampleChrome();
+}
+
+async function showSamplePortfolio() {
+  sampleMode = true;
+  bindUi();
+  resetLocalState();
+  updateSampleChrome();
+  showScreen('app');
+  try {
+    await loadProperties();
+    showView('list');
+  } catch (error) {
+    showToast(friendlyError(error));
+    propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Could not load sample</h3><p>${escapeHTML(friendlyError(error))}</p><button class="secondary-button" type="button" data-action="leave-sample">Leave sample</button></div>`;
+  }
+}
+
+async function leaveSample() {
+  leaveSampleHash();
+  closeModals();
+  if (getUser() && getAccount()) {
+    showScreen('app');
+    updateSampleChrome();
+    updateAccountSummary();
+    try {
+      await loadProperties();
+      await afterPropertiesReady();
+    } catch (error) {
+      showToast(friendlyError(error));
+    }
+    return;
+  }
+  resetLocalState();
+  updateSampleChrome();
+  showAuthMode('signin');
+  showScreen('auth');
+}
+
+function openCreateFromSample() {
+  leaveSampleHash();
+  resetLocalState();
+  updateSampleChrome();
+  showAuthMode('signup');
+  showScreen('auth');
 }
 
 function updateAccountSummary() {
@@ -454,7 +548,7 @@ function updateAccountSummary() {
   const email = user?.email || 'your email';
   const name = account?.name || 'Your account';
   summary.textContent = `Signed in as ${email}. Homes in “${name}” stay private to this account.`;
-  inviteButton.hidden = !isOwner();
+  inviteButton.hidden = sampleMode || !isOwner();
 }
 
 async function openAccountMenu() {
@@ -552,8 +646,11 @@ function bindUi() {
   document.querySelector('#skipImportButton').addEventListener('click', async () => {
     markLegacyOffered();
     closeModals();
-    await maybeSeedSampleData();
     showView('list');
+  });
+  document.querySelector('#viewSampleButton')?.addEventListener('click', event => {
+    event.preventDefault();
+    enterSampleHash();
   });
   document.querySelector('#signOutButton').addEventListener('click', async () => {
     closeModals();
@@ -566,6 +663,9 @@ function bindUi() {
       const action = actionTarget.dataset.action;
       if (action === 'add') openForm();
       if (action === 'edit') openForm(properties.find(property => property.id === actionTarget.dataset.id));
+      if (action === 'view-sample') enterSampleHash();
+      if (action === 'leave-sample') void leaveSample();
+      if (action === 'sample-create') openCreateFromSample();
       if (action === 'back-to-list' || action === 'cancel-form') showView('list');
       if (action === 'clear-filters') { searchInput.value = ''; activeFilter = 'all'; document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all')); renderList(); }
       if (action === 'close-backup') backupPanel.hidden = true;
@@ -574,7 +674,7 @@ function bindUi() {
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
         importPanel.hidden = true;
-        maybeSeedSampleData().then(() => showView('list'));
+        showView('list');
       }
       return;
     }
@@ -586,7 +686,7 @@ function bindUi() {
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();
       importPanel.hidden = true;
-      maybeSeedSampleData().then(() => showView('list'));
+      showView('list');
     }
   });
   document.addEventListener('keydown', event => {
@@ -608,7 +708,22 @@ function resetLocalState() {
 
 startAuth(async ({ status, notice }) => {
   bindUi();
-  if (status === 'need-config' || status === 'signed-out') {
+  if (status === 'need-config') {
+    sampleMode = false;
+    resetLocalState();
+    updateSampleChrome();
+    return;
+  }
+  if (status === 'signed-in' && isSampleHash(location.hash)) {
+    history.replaceState({}, '', `${location.pathname}${location.search}`);
+  }
+  if (isSampleHash(location.hash)) {
+    await showSamplePortfolio();
+    return;
+  }
+  sampleMode = false;
+  updateSampleChrome();
+  if (status === 'signed-out') {
     resetLocalState();
     return;
   }
@@ -622,6 +737,14 @@ startAuth(async ({ status, notice }) => {
     showToast(friendlyError(error));
     propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Could not load homes</h3><p>${escapeHTML(friendlyError(error))}</p></div>`;
   }
+});
+
+window.addEventListener('hashchange', () => {
+  if (isSampleHash(location.hash)) {
+    void showSamplePortfolio();
+    return;
+  }
+  if (sampleMode) void leaveSample();
 });
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

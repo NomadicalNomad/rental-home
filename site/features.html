@@ -71,6 +71,7 @@
         <div class="cta-row">
           <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
           <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Already have one? Sign in</a>
+          <a class="button secondary" data-app-sample href="https://app.rentmanor.com/#/sample">View sample</a>
         </div>
       </section>
     </div>
@@ -96,6 +97,7 @@
       if (!/\.github\.io$/i.test(location.hostname)) return;
       var href = 'https://nomadicalnomad.github.io/rental-home/app/';
       document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      document.querySelectorAll('[data-app-sample]').forEach(function (a) { a.href = href + '#/sample'; });
     })();
   </script>
 </body>

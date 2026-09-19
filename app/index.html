@@ -84,6 +84,7 @@
       <button class="primary-button" type="submit">Create account</button>
       <p class="auth-switch">Already have an account? <button class="text-button" id="showSignIn" type="button">Sign in</button></p>
     </form>
+    <p class="auth-switch sample-auth-link"><button class="text-button" id="viewSampleButton" type="button">View sample homes</button></p>
   </div>
 
   <div id="signedInApp" class="app-shell" hidden>
@@ -98,6 +99,13 @@
     </header>
 
     <main id="app" tabindex="-1">
+      <div id="sampleBanner" class="invite-banner sample-banner" hidden>
+        <p>These are shared sample homes for learning. They are not yours and cannot be edited.</p>
+        <p class="sample-banner-actions">
+          <button class="text-button" id="sampleCreateButton" type="button" data-action="sample-create">Create an account</button>
+          <button class="text-button" type="button" data-action="leave-sample">Leave sample</button>
+        </p>
+      </div>
       <section id="listView" class="view" aria-labelledby="listHeading">
         <div class="section-heading">
           <div>

@@ -136,7 +136,7 @@ export function showScreen(name) {
   showEl('#signedInApp', name === 'app');
 }
 
-function showAuthMode(mode) {
+export function showAuthMode(mode) {
   const signIn = document.querySelector('#signInForm');
   const signUp = document.querySelector('#signUpForm');
   if (signIn) signIn.hidden = mode !== 'signin';
@@ -189,22 +189,31 @@ async function rpc(name, args = {}) {
 }
 
 async function loadMemberships(user) {
-  const { data, error } = await supabase
+  const withSample = await supabase
+    .from('account_members')
+    .select('account_id, role, email, created_at, accounts ( id, name, seeded, is_sample, created_at )')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true });
+  if (!withSample.error) return withSample.data || [];
+  const message = String(withSample.error.message || '');
+  if (!/is_sample|schema cache|column/i.test(message)) throw withSample.error;
+  const fallback = await supabase
     .from('account_members')
     .select('account_id, role, email, created_at, accounts ( id, name, seeded, created_at )')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
+  if (fallback.error) throw fallback.error;
+  return fallback.data || [];
 }
 
 function pickAccount(memberships, preferredId) {
-  if (!memberships.length) return null;
+  const personal = (memberships || []).filter(row => !row.accounts?.is_sample);
+  if (!personal.length) return null;
   if (preferredId) {
-    const match = memberships.find(row => row.account_id === preferredId);
+    const match = personal.find(row => row.account_id === preferredId);
     if (match) return match;
   }
-  return memberships.find(row => row.role === 'owner') || memberships[0];
+  return personal.find(row => row.role === 'owner') || personal[0];
 }
 
 function toAccount(row) {
@@ -213,6 +222,7 @@ function toAccount(row) {
     id: row.accounts?.id || row.account_id,
     name: row.accounts?.name || 'Your account',
     seeded: Boolean(row.accounts?.seeded),
+    isSample: Boolean(row.accounts?.is_sample),
     role: row.role
   };
 }
@@ -342,13 +352,14 @@ export async function listMembers() {
 }
 
 export async function markAccountSeeded() {
-  if (!currentAccount?.id) return;
+  if (!currentAccount?.id || currentAccount.isSample) return;
   await rpc('mark_account_seeded', { target_account: currentAccount.id });
   currentAccount.seeded = true;
 }
 
 export async function replaceAccountProperties(rows) {
   if (!currentAccount?.id) throw new Error('Not signed in');
+  if (currentAccount.isSample) throw new Error('Sample homes cannot be changed.');
   await rpc('replace_account_properties', {
     target_account: currentAccount.id,
     payload: rows
