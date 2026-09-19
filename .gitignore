@@ -1,5 +1,10 @@
 .DS_Store
 Thumbs.db
 *.log
+
+# Secrets and local machine config
 .env
 .env.*
+!.env.example
+config.js
+config.local.js
