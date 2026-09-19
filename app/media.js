@@ -29,9 +29,12 @@ export function extensionForType(contentType, fallback = 'bin') {
 }
 
 export function isPdf(fileOrType, fileName = '') {
-  const type = typeof fileOrType === 'string' ? fileOrType : fileOrType?.type;
+  const type = String(typeof fileOrType === 'string' ? fileOrType : fileOrType?.type || '').toLowerCase();
   const name = fileName || fileOrType?.name || '';
-  return String(type || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(name);
+  return type === 'application/pdf'
+    || type === 'application/x-pdf'
+    || type === 'application/acrobat'
+    || /\.pdf$/i.test(name);
 }
 
 function canvasToBlob(canvas, type, quality) {
@@ -86,20 +89,33 @@ export async function compressImageFile(file) {
 export function assertPdfSize(file) {
   if (!file || !isPdf(file)) throw new Error('Please choose a PDF.');
   if (file.size > MAX_PDF_BYTES) throw new Error('That PDF is too large. Try one under 8 MB.');
-  return file;
+  // Some file pickers leave type empty; account-media allowlist rejects octet-stream.
+  if (String(file.type || '').toLowerCase() === 'application/pdf') return file;
+  return new File([file], file.name || 'receipt.pdf', {
+    type: 'application/pdf',
+    lastModified: file.lastModified || Date.now()
+  });
 }
 
 export async function uploadAccountMedia(path, file, { upsert = true } = {}) {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Not signed in');
+  const contentType = isPdf(file)
+    ? 'application/pdf'
+    : (file.type || 'application/octet-stream');
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     upsert,
-    contentType: file.type || 'application/octet-stream',
+    contentType,
     cacheControl: '3600'
   });
   if (error) {
     const message = String(error.message || '');
     if (/fetch|network/i.test(message)) throw new Error('Couldn’t save photo — check connection.');
+    if (/mime|content.?type|not allowed|invalid/i.test(message)) {
+      throw new Error(isPdf(file)
+        ? 'Couldn't save that PDF. Try another file.'
+        : 'Couldn't save that photo. Try another file.');
+    }
     throw error;
   }
   signedCache.delete(path);

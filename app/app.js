@@ -1137,7 +1137,7 @@ async function saveReceiptForExpense(property, expense, file = pendingReceiptFil
     account_id: activeAccountId(),
     expense_id: expense.id,
     storage_path: path,
-    content_type: readyFile.type || '',
+    content_type: isPdf(readyFile) ? 'application/pdf' : (readyFile.type || ''),
     file_name: readyFile.name || `receipt.${ext}`
   };
   const supabase = getSupabase();
@@ -1162,8 +1162,25 @@ async function applyPickedReceipt(file) {
     pendingReceiptPreview = isPdf(ready) ? '' : URL.createObjectURL(ready);
     const property = properties.find(item => item.id === expensePropertyId);
     const expense = (expensesByProperty.get(expensePropertyId) || []).find(item => item.id === editingExpenseId);
-    if (property) renderExpenseForm(property, expense || null);
     if (receiptError) receiptError.hidden = true;
+    // Existing expense: persist now so PDF/image replace survives without another Save tap.
+    if (property && expense?.id) {
+      const bar = expenseView.querySelector('.upload-bar');
+      if (bar) bar.hidden = false;
+      try {
+        await saveReceiptForExpense(property, expense, ready);
+        pendingReceiptFile = null;
+        revokeObjectUrl(pendingReceiptPreview);
+        pendingReceiptPreview = '';
+        showToast('Receipt saved.');
+        await loadReceipts(expense.id);
+        renderExpenseForm(property, (expensesByProperty.get(property.id) || []).find(item => item.id === expense.id) || expense);
+      } finally {
+        if (bar) bar.hidden = true;
+      }
+      return;
+    }
+    if (property) renderExpenseForm(property, expense || null);
   } catch (error) {
     if (receiptError) {
       receiptError.hidden = false;
