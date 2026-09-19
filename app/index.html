@@ -54,7 +54,7 @@
     <form id="signInForm" class="auth-card" novalidate>
       <div class="js-auth-error form-error" role="alert" hidden></div>
       <h2>Welcome back</h2>
-      <p class="muted">Use the email and password for your account. It’s okay if more than one person uses the same sign-in.</p>
+      <p class="muted">Use the email and password for this account.</p>
       <label>Email
         <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
       </label>
@@ -69,7 +69,7 @@
     <form id="signUpForm" class="auth-card" novalidate hidden>
       <div class="js-auth-error form-error" role="alert" hidden></div>
       <h2>Create your RentManor account</h2>
-      <p class="muted">Your properties stay in your account. Invite people you trust when you want to share.</p>
+      <p class="muted">Your properties stay in this account. To share with a partner or helper, invite them after you sign in — don’t share your password.</p>
       <label>Email
         <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
       </label>
@@ -242,6 +242,7 @@
         <button class="modal-close" type="button" data-action="close-account" aria-label="Close">×</button>
         <h2 id="accountTitle">Your account</h2>
         <p id="accountSummary" class="muted">Signed in.</p>
+        <p class="muted">Prefer not to invite? Two people can sign in with the same email and password, but invite is the clearer way to share.</p>
         <div class="backup-actions">
           <button class="primary-button" id="inviteButton" type="button">Invite someone</button>
           <button class="secondary-button" id="backupButton" type="button">Backup &amp; restore</button>
@@ -255,7 +256,7 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle">
         <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">×</button>
         <h2 id="inviteTitle">Invite someone to this account</h2>
-        <p class="muted">They can view and edit the same properties you can. Other investors keep their own accounts.</p>
+        <p class="muted">They’ll use their own email and password, and can view and edit the same properties you do (including add and delete). Other investors keep their own accounts. Invites are for people you trust with this portfolio.</p>
         <div id="memberList" class="member-list muted"></div>
         <form id="inviteForm" novalidate>
           <label>Their email <span class="optional">(optional)</span>

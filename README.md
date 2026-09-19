@@ -25,16 +25,15 @@ Until DNS is live, GitHub Pages still works:
 3. Enter an email and a password (at least 6 characters).
 4. You land on **Your properties**. Those homes belong only to this account.
 
-It is okay if Mom and a helper both use the **same email and password**. That is the simplest way to share.
+Share a portfolio by **invite**, not by handing out the password.
 
 ## Invite / share
 
-Two ways to let a second person see the same portfolio:
+The owner taps **Account → Invite someone**. Optionally type their email, then **Create invite link**. Send the link or the short code. They create their own sign-in (or sign in) and then see the same homes.
 
-1. **Shared sign-in** — give them the same email and password.
-2. **Invite** — the owner taps **Account → Invite someone**. Optionally type their email, then **Create invite link**. Send the link or the short code. They create their own sign-in (or sign in) and then see the same homes.
+Invites work for 14 days. They join as a **member** of *this* account: they can view and edit the same properties you do (including add and delete). They do not get a copy of someone else’s properties. Only the owner can send invites. Invites are for people you trust with this portfolio.
 
-Invites work for 14 days. They join as a **member** of *this* account: they can view and edit the same properties you can. They do not get a copy of someone else’s properties. Only the owner can send invites.
+Prefer not to invite? Two people can sign in with the same email and password, but invite is the clearer way to share.
 
 ## Forgot password
 
@@ -46,12 +45,10 @@ Those destinations must stay on the Supabase **Redirect URLs** list (see Configu
 
 Until DNS is live, use the working app URL in Safari (not Chrome):
 
-1. Open https://nomadicalnomad.github.io/rental-home/app/ in Safari (not Chrome).
+1. Open https://nomadicalnomad.github.io/rental-home/app/ in Safari (not Chrome). When rentmanor.com / app.rentmanor.com are live, open https://app.rentmanor.com/ instead.
 2. Tap the Share button.
 3. Tap Add to Home Screen.
 4. Tap Add.
-
-rentmanor.com / app.rentmanor.com will replace that address after DNS.
 
 On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 
