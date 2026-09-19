@@ -3,7 +3,7 @@
 --
 -- After this SQL:
 --   1. Authentication → Providers → Email: enable Email.
---      For Mom-simple sign-up, turn OFF "Confirm email" (otherwise she must click a mail link).
+--      For simplest sign-up, turn OFF "Confirm email" (otherwise she must click a mail link).
 --   2. Authentication → URL configuration:
 --        Site URL = https://app.rentmanor.com
 --        Redirect URLs include that origin, https://nomadicalnomad.github.io/rental-home/app/**,

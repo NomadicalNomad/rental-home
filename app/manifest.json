@@ -1,7 +1,7 @@
 {
   "name": "RentManor",
   "short_name": "RentManor",
-  "description": "Your rentals, held with a little dignity.",
+  "description": "Your properties. Your people.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

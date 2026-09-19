@@ -4,7 +4,7 @@ RentManor is a simple iPhone Home Screen app for managing rentals — for you an
 
 The GitHub repo slug stays `rental-home`. The user-facing name is **RentManor**.
 
-**Tagline:** Your rentals, held with a little dignity.
+**Tagline:** Your properties. Your people.
 
 ## Live URLs
 
@@ -64,7 +64,7 @@ This app talks to **Supabase** (email/password auth + Postgres + row-level secur
 
 1. Create a free project at [supabase.com](https://supabase.com).
 2. **SQL editor:** paste and run `supabase/schema.sql`.
-3. **Authentication → Providers → Email:** enable Email. For Mom-simple sign-up, turn **Confirm email** off (otherwise she must click a mail link).
+3. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
 4. **Authentication → URL configuration:**
    - Site URL: `https://app.rentmanor.com`
    - Redirect URLs: that origin, `https://nomadicalnomad.github.io/rental-home/app/**`, and `http://localhost:8000/**`

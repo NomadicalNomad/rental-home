@@ -1,14 +1,12 @@
 # One Netlify site, publish the repo root.
-# After Damon adds the custom domains in Netlify, these host rules split traffic:
+# Host rules:
 #   rentmanor.com (+ www → apex) → site/
 #   app.rentmanor.com             → app/
 #
-# Until DNS is live, the default *.netlify.app URL still serves both folders:
-#   /site/  marketing
-#   /app/   PWA
-#
-# GitHub Pages fallback (no host routing): same paths under
-#   https://nomadicalnomad.github.io/rental-home/
+# Netlify Pretty URLs / canonical rewriting may turn relative site links into
+# absolute /site/... paths. Those must NOT go through the catch-all
+# rentmanor.com/* → /site/:splat (that would become /site/site/...).
+# More-specific /site/* and /app/* rules come first.
 
 [build]
   publish = "."
@@ -27,7 +25,7 @@
   status = 301
   force = true
 
-# App host → PWA folder (URL stays on app.rentmanor.com)
+# App host → PWA folder
 [[redirects]]
   from = "https://app.rentmanor.com/*"
   to = "/app/:splat"
@@ -40,7 +38,27 @@
   status = 200
   force = true
 
-# Apex → marketing folder (URL stays on rentmanor.com)
+# Apex: already-/site/ paths (Pretty URL absolute links) — do not double-prefix
+[[redirects]]
+  from = "https://rentmanor.com/site/*"
+  to = "/site/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/site"
+  to = "/site/"
+  status = 200
+  force = true
+
+# Apex: already-/app/ paths if someone hits them on the marketing host
+[[redirects]]
+  from = "https://rentmanor.com/app/*"
+  to = "/app/:splat"
+  status = 200
+  force = true
+
+# Apex → marketing folder for bare paths (/features.html, /)
 [[redirects]]
   from = "https://rentmanor.com/*"
   to = "/site/:splat"
