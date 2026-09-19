@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="A simple, private rental property manager for your phone.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Rental Home</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Mom's rental homes</p>
+        <h1>Rental Home</h1>
+      </div>
+      <button class="icon-button" id="backupButton" type="button" aria-label="Back up or restore data" title="Back up or restore data">
+        <span aria-hidden="true">↥</span>
+      </button>
+    </header>
+
+    <main id="app" tabindex="-1">
+      <section id="listView" class="view" aria-labelledby="listHeading">
+        <div class="section-heading">
+          <div>
+            <h2 id="listHeading">Your properties</h2>
+            <p id="propertyCount" class="muted"></p>
+          </div>
+          <button class="primary-button compact" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
+        </div>
+        <label class="search-box" for="searchInput">
+          <span aria-hidden="true">⌕</span>
+          <span class="sr-only">Search properties</span>
+          <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
+          <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+        </label>
+        <div class="filter-row" aria-label="Filter properties">
+          <button class="filter-button active" type="button" data-filter="all">All</button>
+          <button class="filter-button" type="button" data-filter="occupied">Occupied</button>
+          <button class="filter-button" type="button" data-filter="vacant">Vacant</button>
+        </div>
+        <div id="propertyList" class="property-list" aria-live="polite"></div>
+      </section>
+
+      <section id="detailView" class="view" aria-labelledby="detailHeading" hidden></section>
+
+      <section id="formView" class="view" aria-labelledby="formHeading" hidden>
+        <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
+        <div class="section-heading form-title">
+          <div>
+            <p class="eyebrow" id="formEyebrow">New property</p>
+            <h2 id="formHeading">Add a home</h2>
+          </div>
+        </div>
+        <form id="propertyForm" novalidate>
+          <div id="formError" class="form-error" role="alert" hidden></div>
+          <fieldset>
+            <legend>Property details</legend>
+            <label>Street address <span class="required" aria-hidden="true">*</span>
+              <input name="address" type="text" autocomplete="street-address" required maxlength="120" placeholder="123 Main Street">
+            </label>
+            <div class="two-columns">
+              <label>City <span class="required" aria-hidden="true">*</span>
+                <input name="city" type="text" autocomplete="address-level2" required maxlength="60" placeholder="Folsom">
+              </label>
+              <label>State <span class="required" aria-hidden="true">*</span>
+                <input name="state" type="text" autocomplete="address-level1" required maxlength="2" placeholder="CA">
+              </label>
+            </div>
+            <div class="two-columns">
+              <label>ZIP code <span class="required" aria-hidden="true">*</span>
+                <input name="zip" type="text" inputmode="numeric" autocomplete="postal-code" required pattern="[0-9]{5}(-[0-9]{4})?" maxlength="10" placeholder="95630">
+              </label>
+              <label>Monthly rent
+                <input name="rent" type="number" inputmode="decimal" min="0" step="1" placeholder="2400">
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Rental status</legend>
+            <div class="status-choice" role="radiogroup" aria-label="Rental status">
+              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>A tenant lives here</small></span></label>
+              <label class="choice-card"><input type="radio" name="status" value="vacant"><span><strong>Vacant</strong><small>Ready for a tenant</small></span></label>
+            </div>
+          </fieldset>
+          <fieldset id="tenantFields">
+            <legend>Tenant details <span class="optional">(optional for vacant homes)</span></legend>
+            <label>Tenant name
+              <input name="tenantName" type="text" autocomplete="name" maxlength="100" placeholder="Alex Johnson">
+            </label>
+            <div class="two-columns">
+              <label>Phone
+                <input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(916) 555-0123">
+              </label>
+              <label>Email
+                <input name="email" type="email" autocomplete="email" maxlength="120" placeholder="alex@example.com">
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Notes <span class="optional">(optional)</span></legend>
+            <label for="notes" class="sr-only">Property notes</label>
+            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
+          </fieldset>
+          <div class="form-actions">
+            <button class="primary-button" type="submit">Save property</button>
+            <button class="secondary-button" type="button" data-action="cancel-form">Cancel</button>
+            <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <input id="restoreInput" type="file" accept="application/json,.json" hidden>
+
+    <div id="backupPanel" class="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+        <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
+        <h2 id="backupTitle">Backup &amp; restore</h2>
+        <p class="muted">Keep a copy of your properties somewhere safe. Restoring replaces all properties currently on this phone.</p>
+        <div class="backup-actions">
+          <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
+          <button class="secondary-button" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>
