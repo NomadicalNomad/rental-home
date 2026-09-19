@@ -36,6 +36,7 @@
         <div class="cta-row">
           <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
           <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Sign in</a>
+          <a class="button secondary" data-app-sample href="https://app.rentmanor.com/#/sample">View sample</a>
         </div>
         <p class="sample-nudge"><a data-sample-cta href="https://app.rentmanor.com/#/sample">View sample</a> — look around a demo portfolio. Nothing to sign in for.</p>
       </div>
@@ -88,7 +89,7 @@
         appBase = location.origin + '/app/';
       }
       document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = appBase; });
-      document.querySelectorAll('[data-sample-cta]').forEach(function (a) { a.href = appBase + '#/sample'; });
+      document.querySelectorAll('[data-sample-cta], [data-app-sample]').forEach(function (a) { a.href = appBase + '#/sample'; });
     })();
   </script>
 </body>

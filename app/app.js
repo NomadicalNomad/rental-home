@@ -1,5 +1,13 @@
 /* RentManor — per-account property manager (Supabase-backed). */
 import {
+  SAMPLE_ACCOUNT_ID,
+  canMutateAccount,
+  rowsForAccount,
+  samplePortfolio,
+  scopedAccountId,
+  shouldInjectDemoProperties
+} from './account-scope.js';
+import {
   startAuth,
   getSupabase,
   getUser,
@@ -12,7 +20,6 @@ import {
   markAccountSeeded,
   replaceAccountProperties,
   friendlyError,
-  SAMPLE_ACCOUNT_ID,
   enterSampleRoute,
   exitSampleRoute,
   requestAuthMode,
@@ -93,39 +100,12 @@ let exportPropertyId = null;
 let confirmResolve = null;
 let usingSampleFallback = false;
 
-const SAMPLE_FALLBACK_HOMES = [
-  {
-    id: '00000000-0000-4000-8000-000000000011',
-    address: '1124 Iron Point Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied',
-    tenantName: 'Maria Hernandez', phone: '(916) 555-0148', email: 'maria.h@example.com', rent: '2450',
-    notes: 'Renewal conversation in October.',
-    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000011.svg',
-    createdAt: '2026-03-01T16:00:00Z', updatedAt: '2026-09-12T17:00:00Z'
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000012',
-    address: '704 Blue Ravine Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'vacant',
-    tenantName: '', phone: '', email: '', rent: '2200',
-    notes: 'Fresh paint completed in the living room.',
-    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000012.svg',
-    createdAt: '2026-04-12T16:00:00Z', updatedAt: '2026-08-03T18:00:00Z'
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000013',
-    address: '1538 East Bidwell Street', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied',
-    tenantName: 'James Wilson', phone: '(916) 555-0196', email: 'james.wilson@example.com', rent: '2750',
-    notes: 'Two-car garage; gardener included.',
-    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000013.svg',
-    createdAt: '2026-02-18T16:00:00Z', updatedAt: '2026-09-08T16:30:00Z'
-  }
-];
-
 const SAMPLE_FALLBACK_EXPENSES = [
-  { id: '00000000-0000-4000-8000-000000000021', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-09-12', amount: 84, category: 'Repairs', notes: 'HVAC filter', createdAt: '2026-09-12T17:10:00Z', updatedAt: '2026-09-12T17:10:00Z' },
-  { id: '00000000-0000-4000-8000-000000000022', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-01-15', amount: 420, category: 'Insurance', notes: 'Annual landlord policy', createdAt: '2026-01-15T18:00:00Z', updatedAt: '2026-01-15T18:00:00Z' },
-  { id: '00000000-0000-4000-8000-000000000023', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000012', spentOn: '2026-08-03', amount: 186.5, category: 'Supplies', notes: 'Living room paint', createdAt: '2026-08-03T18:20:00Z', updatedAt: '2026-08-03T18:20:00Z' },
-  { id: '00000000-0000-4000-8000-000000000024', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-08', amount: 62.4, category: 'Utilities', notes: 'Water', createdAt: '2026-09-08T16:40:00Z', updatedAt: '2026-09-08T16:40:00Z' },
-  { id: '00000000-0000-4000-8000-000000000025', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-01', amount: 75, category: 'Other', notes: 'Gardener', createdAt: '2026-09-01T15:00:00Z', updatedAt: '2026-09-01T15:00:00Z' }
+  { id: '00000000-0000-4000-8000-000000000021', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', spentOn: '2026-09-12', amount: 84, category: 'Repairs', notes: 'HVAC filter', createdAt: '2026-09-12T17:10:00Z', updatedAt: '2026-09-12T17:10:00Z' },
+  { id: '00000000-0000-4000-8000-000000000022', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', spentOn: '2026-01-15', amount: 420, category: 'Insurance', notes: 'Annual landlord policy', createdAt: '2026-01-15T18:00:00Z', updatedAt: '2026-01-15T18:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000023', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000002', spentOn: '2026-08-03', amount: 186.5, category: 'Supplies', notes: 'Living room paint', createdAt: '2026-08-03T18:20:00Z', updatedAt: '2026-08-03T18:20:00Z' },
+  { id: '00000000-0000-4000-8000-000000000024', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', spentOn: '2026-09-08', amount: 62.4, category: 'Utilities', notes: 'Water', createdAt: '2026-09-08T16:40:00Z', updatedAt: '2026-09-08T16:40:00Z' },
+  { id: '00000000-0000-4000-8000-000000000025', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', spentOn: '2026-09-01', amount: 75, category: 'Other', notes: 'Gardener', createdAt: '2026-09-01T15:00:00Z', updatedAt: '2026-09-01T15:00:00Z' }
 ];
 
 const SAMPLE_FALLBACK_RECEIPTS = [
@@ -135,7 +115,7 @@ const SAMPLE_FALLBACK_RECEIPTS = [
 
 function applySampleFallback() {
   usingSampleFallback = true;
-  properties = SAMPLE_FALLBACK_HOMES.map(home => ({ ...home }));
+  properties = samplePortfolio().map(fromRow);
   expensesByProperty = new Map();
   receiptsByExpense = new Map();
   SAMPLE_FALLBACK_EXPENSES.forEach(item => {
@@ -165,12 +145,11 @@ function offeredKey() {
 }
 
 function activeAccountId() {
-  if (sampleMode) return SAMPLE_ACCOUNT_ID;
-  return getAccount()?.id || '';
+  return scopedAccountId({ sampleMode, accountId: getAccount()?.id || null }) || '';
 }
 
 function canWrite() {
-  return !sampleMode && Boolean(getAccount()?.id);
+  return canMutateAccount({ sampleMode, accountId: getAccount()?.id || null });
 }
 
 function cleanProperty(value, index = 0) {
@@ -217,6 +196,7 @@ function fromRow(row) {
 }
 
 function toRow(property) {
+  assertWritable();
   const account = getAccount();
   return {
     id: property.id,
@@ -303,23 +283,26 @@ function readBackupFile(text) {
 }
 
 async function loadProperties() {
+  if (sampleMode) {
+    applySampleFallback();
+    return;
+  }
   const supabase = getSupabase();
   const accountId = activeAccountId();
+  if (!supabase || !accountId) {
+    properties = [];
+    return;
+  }
   const { data, error } = await supabase
     .from('properties')
     .select('*')
     .eq('account_id', accountId)
     .order('updated_at', { ascending: false });
-  if (error) {
-    if (sampleMode) {
-      applySampleFallback();
-      return;
-    }
-    throw error;
+  if (error) throw error;
+  properties = rowsForAccount(data || [], accountId).map(fromRow);
+  if (shouldInjectDemoProperties({ account: getAccount(), properties, sampleMode })) {
+    properties = [];
   }
-  usingSampleFallback = false;
-  properties = (data || []).map(fromRow);
-  if (sampleMode && !properties.length) applySampleFallback();
 }
 
 async function loadExpenses(propertyId) {
@@ -1291,6 +1274,7 @@ function downloadBackup() {
 }
 
 async function handleRestore(event) {
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); event.target.value = ''; return; }
   const file = event.target.files[0];
   event.target.value = '';
   if (!file || !canWrite()) return;
@@ -1339,6 +1323,7 @@ function openImportPanel(mode) {
 }
 
 async function importLegacyProperties() {
+  if (sampleMode) { showToast('Sample homes cannot be changed.'); return; }
   const legacy = getLegacyProperties();
   if (!legacy.length) return;
   try {
@@ -1358,7 +1343,7 @@ async function afterPropertiesReady() {
   updateLegacyButton();
   const legacy = getLegacyProperties();
   const alreadyOffered = Boolean(localStorage.getItem(offeredKey()));
-  if (legacy.length && !alreadyOffered && !properties.length) {
+  if (!sampleMode && legacy.length && !alreadyOffered && !properties.length) {
     openImportPanel('offer');
     return;
   }
@@ -1372,7 +1357,7 @@ function updateAccountSummary() {
   const email = user?.email || 'your email';
   const name = account?.name || 'Your account';
   summary.textContent = `Signed in as ${email}. Homes in “${name}” stay private to this account.`;
-  inviteButton.hidden = !isOwner();
+  inviteButton.hidden = sampleMode || !isOwner();
 }
 
 async function openAccountMenu() {

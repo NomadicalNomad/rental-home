@@ -1,4 +1,5 @@
 /* Auth + account + invite for RentManor (vanilla PWA, Supabase). */
+import { isSampleAccountId } from './account-scope.js';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/+esm';
 const INVITE_STORAGE_KEY = 'rental-home-invite-token';
 const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';
@@ -262,10 +263,12 @@ function pickAccount(memberships, preferredId) {
 
 function toAccount(row) {
   if (!row) return null;
+  const id = row.accounts?.id || row.account_id;
   return {
-    id: row.accounts?.id || row.account_id,
+    id,
     name: row.accounts?.name || 'Your account',
     seeded: Boolean(row.accounts?.seeded),
+    isSample: isSampleAccountId(id),
     role: row.role
   };
 }
@@ -395,13 +398,14 @@ export async function listMembers() {
 }
 
 export async function markAccountSeeded() {
-  if (!currentAccount?.id) return;
+  if (!currentAccount?.id || currentAccount.isSample) return;
   await rpc('mark_account_seeded', { target_account: currentAccount.id });
   currentAccount.seeded = true;
 }
 
 export async function replaceAccountProperties(rows) {
   if (!currentAccount?.id) throw new Error('Not signed in');
+  if (currentAccount.isSample) throw new Error('Sample homes cannot be changed.');
   await rpc('replace_account_properties', {
     target_account: currentAccount.id,
     payload: rows

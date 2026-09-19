@@ -5,6 +5,7 @@ const APP_SHELL = [
   './styles.css',
   './app.js',
   './auth.js',
+  './account-scope.js',
   './media.js',
   './export.js',
   './manifest.json',

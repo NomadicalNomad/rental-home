@@ -59,6 +59,8 @@ On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 - After sign-in, if this phone still has the old on-device list, the app offers a **one-time import** into the account.
 - JSON backups cover properties. Photos and receipts stay in private Storage; a full media zip is out of scope for v1.
 
+New accounts start with **zero** properties. Folsom sample homes appear only in shared sample mode at `/#/sample` (logical account `00000000-0000-4000-8000-000000000001`). They are never copied into a personal account.
+
 ## Sample portfolio
 
 Anyone can open the shared demo without signing in:
@@ -66,7 +68,7 @@ Anyone can open the shared demo without signing in:
 - App: https://app.rentmanor.com/#/sample
 - GitHub Pages: https://nomadicalnomad.github.io/rental-home/app/#/sample
 
-It uses the fixed sample account `00000000-0000-4000-8000-000000000001`. A sticky **SAMPLE · Read only** banner stays on list, detail, and expense. Writes are hidden. Exit with **My account** (signed in) or **Sign in** / **Create account**. There is no “load sample into my account” button. If the sample tables are not applied yet, the app still shows the demo homes from local files so the journey stays view-only.
+A sticky **SAMPLE · Read only** banner stays on list, detail, and expense. Writes are hidden. Exit with **My account** (signed in) or **Sign in** / **Create account**. There is no “load sample into my account” button. The demo homes also ship as local files so `#/sample` works before sample SQL is applied.
 
 ## Photos, expenses, receipts
 
@@ -87,13 +89,13 @@ Photos and receipts live in the private `account-media` bucket:
 This app talks to **Supabase** (email/password auth + Postgres + row-level security). There are no demo logins in the repo.
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. **SQL editor:** paste and run `supabase/schema.sql` (full setup). If this project already ran an older schema, run `supabase/migrations/20260919_photos_expenses_sample.sql` instead. Either file seeds the shared sample account and does **not** wipe personal accounts.
+2. **SQL editor:** paste and run `supabase/schema.sql` (full setup). If this project already ran an older schema, run `supabase/migrations/20260919_photos_expenses_sample.sql` instead. Either file adds photos/expenses tables and does **not** wipe personal accounts or auto-seed Folsom into them.
 3. **Storage:** confirm a **private** bucket named `account-media` exists (the SQL tries to create it). If the insert was skipped:
    1. Dashboard → **Storage → New bucket**
    2. Name: `account-media`
    3. Public: **off**
    4. Re-run the SQL so the path policies attach
-4. **Optional sample media:** upload files from `supabase/sample-media/` into `account-media` using the `storage_path` values in the migration (thumbnail + receipt objects under `00000000-0000-4000-8000-000000000001/`). The app also ships the same files as a sample-only fallback if an object is missing.
+4. **Optional sample media:** upload files from `supabase/sample-media/` into `account-media` using the `storage_path` values in the migration. The app also ships the same files as a sample-only fallback.
 5. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
 6. **Authentication → URL configuration:**
    - Site URL: `https://app.rentmanor.com`
