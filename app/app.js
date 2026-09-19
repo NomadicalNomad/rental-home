@@ -963,10 +963,11 @@ function renderList() {
   hydrateThumbs(propertyList);
 }
 
-function contactButton(label, value, scheme, icon) {
-  if (!value) return `<span class="contact-button disabled" aria-disabled="true"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</span>`;
-  const href = scheme === 'mailto' ? `mailto:${encodeURIComponent(value)}` : `${scheme}:${scheme === 'tel' || scheme === 'sms' ? value.replace(/[^+\d]/g, '') : value}`;
-  return `<a class="contact-button" href="${escapeHTML(href)}"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</a>`;
+function existingTenantName(propertyId) {
+  if (!propertyId) return '';
+  const tenant = tenantByProperty.get(propertyId);
+  if (hasCurrentTenant(tenant)) return tenant.name || '';
+  return properties.find(item => item.id === propertyId)?.tenantName || '';
 }
 
 function expenseSummary(list) {
@@ -1182,10 +1183,8 @@ function readForm() {
   if (!data.address || !data.city || !data.state || !data.zip) return { error: 'Please fill in the required property fields.' };
   if (!data.status) return { error: 'Please choose whether this home is occupied or vacant.' };
   if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
-  if (data.status === 'occupied' && !data.tenantName) return { error: 'Please add the tenant name for an occupied home.' };
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return { error: 'Please enter a valid email address.' };
   if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
-  return { data: { ...data, state: data.state.toUpperCase() } };
+  return { data: { ...data, state: data.state.toUpperCase(), tenantName: existingTenantName(editingId), phone: '', email: '' } };
 }
 
 function readPropertyDetail(formEl) {
@@ -1310,12 +1309,14 @@ async function submitForm(event) {
     pendingPhotoFile = null;
     revokeObjectUrl(pendingPhotoPreview);
     pendingPhotoPreview = '';
-    await syncTenantFromProperty(withPhoto);
+    if (withPhoto.status === 'vacant') await syncTenantFromProperty(withPhoto);
     await loadProperties();
     showToast(existing ? 'Property updated.' : 'Property added.');
-    detailTab = 'property';
-    tenantEditorOpen = false;
-    renderDetail(properties.find(property => property.id === withPhoto.id) || withPhoto);
+    const next = properties.find(property => property.id === withPhoto.id) || withPhoto;
+    const needTenant = next.status === 'occupied' && !hasCurrentTenant(tenantByProperty.get(next.id));
+    detailTab = needTenant ? 'tenant' : 'property';
+    tenantEditorOpen = needTenant;
+    renderDetail(next);
   } catch (error) {
     showFormError(friendlyError(error));
   } finally {

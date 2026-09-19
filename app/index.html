@@ -170,28 +170,15 @@
           <fieldset>
             <legend>Rental status</legend>
             <div class="status-choice" role="radiogroup" aria-label="Rental status">
-              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>A tenant lives here</small></span></label>
+              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>Add the tenant next</small></span></label>
               <label class="choice-card"><input type="radio" name="status" value="vacant"><span><strong>Vacant</strong><small>Ready for a tenant</small></span></label>
             </div>
-          </fieldset>
-          <fieldset id="tenantFields">
-            <legend>Tenant details <span class="optional">(optional for vacant homes)</span></legend>
-            <label>Tenant name
-              <input name="tenantName" type="text" autocomplete="name" maxlength="100" placeholder="Alex Johnson">
-            </label>
-            <div class="two-columns">
-              <label>Phone
-                <input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(916) 555-0123">
-              </label>
-              <label>Email
-                <input name="email" type="email" autocomplete="email" maxlength="120" placeholder="alex@example.com">
-              </label>
-            </div>
+            <p class="muted">Tenant name, phone, and email live on the Tenant tab.</p>
           </fieldset>
           <fieldset>
             <legend>Notes <span class="optional">(optional)</span></legend>
             <label for="notes" class="sr-only">Property notes</label>
-            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
+            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Gate code, lockbox, showing notes…"></textarea>
           </fieldset>
           <fieldset id="homeFactsFields">
             <legend>Home facts <span class="optional">(optional)</span></legend>

@@ -62,6 +62,9 @@ test('vacant tenant tab is an empty state with no fake contact', () => {
   assert.match(empty, /No tenant yet/);
   assert.match(empty, /Add who lives here when this home is occupied/);
   assert.doesNotMatch(empty, /Maria|Alex|555-/);
+  const writable = vacantTenantHtml({ write: true });
+  assert.match(writable, /Add tenant/);
+  assert.doesNotMatch(writable, /name="phone"|name="email"|tenantName/);
   const occupied = tenantTabHtml({
     property: { id: 'p1', status: 'occupied' },
     tenant: sampleTenants()[0],
@@ -72,6 +75,9 @@ test('vacant tenant tab is an empty state with no fake contact', () => {
   assert.match(occupied, /Maria Hernandez/);
   assert.match(occupied, /Lease agreement/);
   assert.match(occupied, /Letters &amp; emails/);
+  assert.match(occupied, /Call/);
+  assert.match(occupied, /Text/);
+  assert.match(occupied, /Email/);
   assert.doesNotMatch(occupied, />Correspondence</);
 });
 
@@ -106,6 +112,44 @@ test('property tab groups Basics, Utilities, Trash, Appliances, and Photos', () 
   assert.match(html, /gallery-star/);
   assert.doesNotMatch(html, /Edit property/);
   assert.doesNotMatch(html, />Expenses</);
+  assert.doesNotMatch(html, /name="phone"|name="email"|name="tenantName"/);
+  assert.doesNotMatch(html, />Call<|>Text<|>Email</);
+});
+
+test('property write form is collapsible groups with no people fields', () => {
+  const home = samplePortfolio()[1];
+  const html = propertyTabHtml({
+    property: {
+      ...home,
+      status: 'vacant',
+      tenantName: '',
+      phone: '',
+      email: '',
+      propertyType: home.property_type,
+      yearBuilt: home.year_built,
+      utilityElectric: '',
+      utilityGas: '',
+      utilityWater: '',
+      utilityNotes: '',
+      trashSchedule: '',
+      trashNotes: ''
+    },
+    photos: [],
+    appliances: [],
+    expenses: [],
+    tenant: null,
+    write: true,
+    sample: false
+  });
+  assert.match(html, /<details class="info-card is-disclosure"/);
+  assert.match(html, /<summary>Basics<\/summary>/);
+  assert.match(html, /<summary>Utilities<\/summary>/);
+  assert.match(html, /<summary>Trash<\/summary>/);
+  assert.match(html, /<summary>Appliances<\/summary>/);
+  assert.match(html, /id="detailSaveBar"/);
+  assert.doesNotMatch(html, /name="tenantName"|name="phone"|name="email"/);
+  assert.doesNotMatch(html, />Call<|>Text</);
+  assert.doesNotMatch(html, /Maria|Alex|555-/);
 });
 
 test('sticky address chrome and 3-segment tabs use selected fill, not underline-only', () => {
@@ -134,6 +178,8 @@ test('index confirm sheet offers Save / Discard / Cancel for dirty tabs', () => 
   assert.match(html, /id="confirmDiscard"/);
   assert.match(html, /id="lightboxActions"/);
   assert.match(html, /Make primary/);
+  assert.doesNotMatch(html, /id="tenantFields"|name="tenantName"/);
+  assert.match(html, /Tenant name, phone, and email live on the Tenant tab/);
 });
 
 test('storage paths follow the Structure freeze', () => {
@@ -162,5 +208,7 @@ test('SQL and PWA keep account isolation and one tenant per property', () => {
   assert.match(appJs, /detail-tab/);
   assert.match(appJs, /Save changes\?/);
   assert.match(appJs, /confirmLeaveDirtyTab/);
+  assert.match(appJs, /Remove tenant info and files for this home\?/);
   assert.doesNotMatch(appJs, /function seedProperties/);
+  assert.doesNotMatch(appJs, /Please add the tenant name for an occupied home/);
 });

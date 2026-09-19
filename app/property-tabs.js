@@ -153,12 +153,7 @@ export function appliancesHtml({ appliances, write }) {
     </form>` : '';
   const empty = !appliances?.length;
   const body = `${rows || '<p class="muted">No appliances listed.</p>'}${add}`;
-  if (write && empty) {
-    return `<details class="info-card is-disclosure">
-      <summary>Appliances</summary>
-      ${body}
-    </details>`;
-  }
+  if (write) return disclosureCard('Appliances', body, !empty);
   return `<div class="info-card">
     <h3>Appliances</h3>
     ${body}
@@ -212,9 +207,15 @@ export function propertyFactsHtml(property) {
     </div>`;
 }
 
+function disclosureCard(title, body, open) {
+  return `<details class="info-card is-disclosure"${open ? ' open' : ''}>
+      <summary>${title}</summary>
+      ${body}
+    </details>`;
+}
+
 function editAddressCard(property) {
-  return `<div class="info-card">
-      <h3>Address</h3>
+  return disclosureCard('Address', `
       <label>Street address <span class="required" aria-hidden="true">*</span>
         <input name="address" type="text" autocomplete="street-address" required maxlength="120" value="${escapeHTML(property.address)}" placeholder="123 Main Street">
       </label>
@@ -233,13 +234,11 @@ function editAddressCard(property) {
         <label>Monthly rent
           <input name="rent" type="number" inputmode="decimal" min="0" step="1" value="${escapeHTML(property.rent)}" placeholder="2450">
         </label>
-      </div>
-    </div>`;
+      </div>`, true);
 }
 
 function editBasicsCard(property) {
-  return `<div class="info-card">
-      <h3>Basics</h3>
+  return disclosureCard('Basics', `
       <p class="info-label">Property type</p>
       ${typeChipsHtml(property.propertyType)}
       <div class="two-columns">
@@ -263,13 +262,12 @@ function editBasicsCard(property) {
       </label>
       <label>Notes <span class="optional">(optional)</span>
         <textarea name="notes" rows="2" maxlength="1000" placeholder="Gate code, lockbox…">${escapeHTML(property.notes)}</textarea>
-      </label>
-    </div>`;
+      </label>`, true);
 }
 
 function editUtilitiesCard(property) {
   const empty = !property.utilityElectric && !property.utilityGas && !property.utilityWater && !property.utilityNotes;
-  const body = `
+  return disclosureCard('Utilities', `
       <label>Electric
         <input name="utilityElectric" type="text" maxlength="80" value="${escapeHTML(property.utilityElectric)}" placeholder="PG&amp;E · acct on file">
       </label>
@@ -281,23 +279,18 @@ function editUtilitiesCard(property) {
       </label>
       <label>Notes <span class="optional">(optional)</span>
         <textarea name="utilityNotes" rows="2" maxlength="400" placeholder="Who pays which bill">${escapeHTML(property.utilityNotes)}</textarea>
-      </label>`;
-  if (empty) {
-    return `<details class="info-card is-disclosure"><summary>Utilities</summary>${body}</details>`;
-  }
-  return `<div class="info-card"><h3>Utilities</h3>${body}</div>`;
+      </label>`, !empty);
 }
 
 function editTrashCard(property) {
-  return `<div class="info-card">
-      <h3>Trash</h3>
+  const empty = !property.trashSchedule && !property.trashNotes;
+  return disclosureCard('Trash', `
       <label>Schedule
         <input name="trashSchedule" type="text" maxlength="80" value="${escapeHTML(property.trashSchedule)}" placeholder="Tue / Fri">
       </label>
       <label>Notes <span class="optional">(optional)</span>
         <textarea name="trashNotes" rows="2" maxlength="400" placeholder="Bins out by 6am">${escapeHTML(property.trashNotes)}</textarea>
-      </label>
-    </div>`;
+      </label>`, !empty);
 }
 
 export function propertyTabHtml({ property, photos, appliances, expenses, tenant, write, sample, expenseSummary = '' }) {
