@@ -719,9 +719,6 @@ startAuth(async ({ status, notice }) => {
     updateSampleChrome();
     return;
   }
-  if (status === 'signed-in' && isSampleHash(location.hash)) {
-    history.replaceState({}, '', `${location.pathname}${location.search}`);
-  }
   if (isSampleHash(location.hash)) {
     await showSamplePortfolio();
     return;
