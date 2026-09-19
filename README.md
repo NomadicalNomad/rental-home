@@ -1,12 +1,26 @@
-# Rental Home
+# RentManor
 
-A simple iPhone Home Screen PWA for a small rental portfolio. Each **account** has its own homes. Account A never sees Account B. Two people can share one account.
+RentManor is a simple iPhone Home Screen app for managing rentals — for you and the people you trust. Each account’s properties stay private. Invite a partner or helper to the same account when you want to share.
 
-Live site: https://nomadicalnomad.github.io/rental-home/
+The GitHub repo slug stays `rental-home`. The user-facing name is **RentManor**.
+
+**Tagline:** Your rentals, held with a little dignity.
+
+## Live URLs
+
+After DNS (Damon / GoDaddy — see [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md)):
+
+- Marketing: https://rentmanor.com/ (`www` → apex)
+- App (Sign in / Create account): https://app.rentmanor.com/
+
+Until DNS is live, GitHub Pages still works:
+
+- Marketing: https://nomadicalnomad.github.io/rental-home/ → `site/`
+- App: https://nomadicalnomad.github.io/rental-home/app/
 
 ## Create an account
 
-1. Open the site in Safari (or a desktop browser).
+1. Open the app in Safari (or a desktop browser): https://app.rentmanor.com/ (or the github.io `/app/` URL above).
 2. Tap **Create an account**.
 3. Enter an email and a password (at least 6 characters).
 4. You land on **Your properties**. Those homes belong only to this account.
@@ -24,9 +38,17 @@ Invites work for 14 days. They join as a member of *this* account; they do not g
 
 ## Add to Home Screen (iPhone)
 
-1. Open the hosted URL in **Safari** (not Chrome).
-2. Tap **Share → Add to Home Screen → Add**.
-3. Open the new icon. Sign in once; stay signed in on that phone.
+1. Open rentmanor.com in Safari (not Chrome).
+2. Tap the Share button.
+3. Tap Add to Home Screen.
+4. Tap Add.
+
+Until DNS is live, the same steps work from the GitHub Pages URLs (Safari, not Chrome):
+
+- Marketing: https://nomadicalnomad.github.io/rental-home/
+- App icon / sign-in: https://nomadicalnomad.github.io/rental-home/app/
+
+On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 
 ## Backup & restore
 
@@ -44,46 +66,53 @@ This app talks to **Supabase** (email/password auth + Postgres + row-level secur
 2. **SQL editor:** paste and run `supabase/schema.sql`.
 3. **Authentication → Providers → Email:** enable Email. For Mom-simple sign-up, turn **Confirm email** off (otherwise she must click a mail link).
 4. **Authentication → URL configuration:**
-   - Site URL: `https://nomadicalnomad.github.io/rental-home`
-   - Redirect URLs: that origin and `http://localhost:8000/**`
+   - Site URL: `https://app.rentmanor.com`
+   - Redirect URLs: that origin, `https://nomadicalnomad.github.io/rental-home/app/**`, and `http://localhost:8000/**`
 5. **Settings → API:** copy **Project URL** and the **anon public** key. Never copy `service_role`.
-6. `cp config.example.js config.js` and paste those two values. Same names are listed in `.env.example`.
-7. GitHub Pages only serves committed files. Because the anon key is public (RLS is what protects data), add `config.js` with:
+6. `cp app/config.example.js app/config.js` and paste those two values. Same names are listed in `.env.example`.
+7. GitHub Pages only serves committed files. Because the anon key is public (RLS is what protects data), add `app/config.js` with:
 
    ```bash
-   git add -f config.js
+   git add -f app/config.js
    git commit -m "Add public Supabase anon config for Pages"
    git push
    ```
 
-8. Reload the Pages URL. You should see **Sign in**, not “This copy isn’t connected yet”.
+8. Reload the app URL. You should see **Sign in / Create account**, not “This copy isn’t connected yet”.
 
 `.gitignore` ignores `.env`, `config.js`, and `config.local.js`. Do not commit `service_role`.
 
+Production `app/index.html` also inlines the same public `window.RENTAL_HOME_CONFIG` values so a missing or service-worker-blocked `config.js` cannot wall visitors. `app/config.js` still loads afterward and can override.
+
 ## Files
 
-- `index.html`, `styles.css`, `app.js`, `auth.js` — app
-- `config.example.js`, `.env.example` — how to point the PWA at Supabase
+- `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms)
+- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `manifest.json`, `sw.js`, `icons/`, `config.js`)
+- `app/config.example.js`, `.env.example` — how to point the PWA at Supabase
 - `supabase/schema.sql` — tables, RLS, invite functions
-- `manifest.json`, `sw.js`, `icons/` — PWA install / offline shell
+- `netlify.toml` — host-based routing (`site/` on apex, `app/` on `app.`)
+- `docs/DNS-GODADDY.md` — exact GoDaddy records Damon must add
 - `rental-home.code-workspace` — VS Code / Cursor workspace
 
 ## Run locally
 
 ```bash
 cd rental-home
-cp config.example.js config.js   # then paste your URL + anon key
+cp app/config.example.js app/config.js   # then paste your URL + anon key
 python3 -m http.server 8000
 ```
 
-Open http://localhost:8000 — a static server is needed for the service worker (it won’t register from `file://`).
+Open:
 
-Without `config.js`, the app shows a clear setup message and does not invent credentials.
+- http://localhost:8000/site/ — marketing
+- http://localhost:8000/app/ — app (a static server is needed for the service worker; it won’t register from `file://`)
+
+Without `config.js` *and* without the inline production values, the app shows a clear setup message and does not invent credentials.
 
 ## Deploy
 
-- **GitHub Pages:** branch `main` / root. After `config.js` is present (force-added), the hosted app can sign people in.
-- **Netlify:** publish directory = repo root, empty build command. Same `config.js` need.
+- **GitHub Pages (fallback):** branch `main` / root. `/` redirects to `site/`. App is at `/app/`.
+- **Netlify (preferred for rentmanor.com):** publish directory = repo root, empty build command. `netlify.toml` rewrites apex → `site/` and `app.rentmanor.com` → `app/`. Then follow [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md).
 
 ## Privacy
 

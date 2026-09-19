@@ -2,247 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f766e">
-  <meta name="description" content="A simple rental property manager for your phone.">
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="stylesheet" href="styles.css">
-  <title>Rental Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RentManor</title>
+  <link rel="canonical" href="site/">
+  <script>
+    // GitHub Pages fallback: marketing lives in site/, the PWA in app/.
+    // Also drop the old root service worker (rental-home-shell-v2) so visitors
+    // are not stuck on a cached config wall from the previous root PWA.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (reg) {
+          var script = (reg.active && reg.active.scriptURL) ||
+            (reg.waiting && reg.waiting.scriptURL) ||
+            (reg.installing && reg.installing.scriptURL) || '';
+          if (/\/sw\.js$/.test(script) && script.indexOf('/app/') === -1) {
+            reg.unregister();
+          }
+        });
+      });
+    }
+    var next = 'site/' + location.search + location.hash;
+    location.replace(next);
+  </script>
+  <meta http-equiv="refresh" content="0; url=site/">
 </head>
 <body>
-  <div id="loadingView" class="app-shell screen-center">
-    <p class="eyebrow">Mom's rental homes</p>
-    <h1>Rental Home</h1>
-    <p class="muted">Opening…</p>
-  </div>
-
-  <div id="setupView" class="app-shell" hidden>
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">Needs a setup</p>
-        <h1>Rental Home</h1>
-      </div>
-    </header>
-    <section class="auth-card">
-      <h2>This copy isn’t connected yet</h2>
-      <p id="setupDetail" class="muted">Add a <strong>config.js</strong> file with your Supabase project URL and anon key, then reload. See the README for the exact steps.</p>
-      <p class="muted">Until that file is in place, nobody can create an account or see properties. That is on purpose — there are no leftover demo logins.</p>
-    </section>
-  </div>
-
-  <div id="authView" class="app-shell" hidden>
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">Mom's rental homes</p>
-        <h1>Rental Home</h1>
-      </div>
-    </header>
-    <div id="inviteBanner" class="invite-banner" hidden>
-      <p id="inviteBannerText">You have an invite to share a rental account.</p>
-    </div>
-
-    <form id="signInForm" class="auth-card" novalidate>
-      <div class="js-auth-error form-error" role="alert" hidden></div>
-      <h2>Sign in</h2>
-      <p class="muted">Use the email and password for your account. It’s okay if more than one person uses the same sign-in.</p>
-      <label>Email
-        <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
-      </label>
-      <label>Password
-        <input name="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Your password">
-      </label>
-      <button class="primary-button" type="submit">Sign in</button>
-      <p class="auth-switch">New here? <button class="text-button" id="showSignUp" type="button">Create an account</button></p>
-    </form>
-
-    <form id="signUpForm" class="auth-card" novalidate hidden>
-      <div class="js-auth-error form-error" role="alert" hidden></div>
-      <h2>Create an account</h2>
-      <p class="muted">This keeps your homes private. You can invite someone later so they see the same list.</p>
-      <label>Email
-        <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
-      </label>
-      <label>Password
-        <input name="password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters">
-      </label>
-      <label>Type the password again
-        <input name="confirm" type="password" autocomplete="new-password" required minlength="6" placeholder="Same password">
-      </label>
-      <label>Name for this account <span class="optional">(optional)</span>
-        <input name="accountName" type="text" maxlength="80" placeholder="My rentals">
-      </label>
-      <button class="primary-button" type="submit">Create account</button>
-      <p class="auth-switch">Already have an account? <button class="text-button" id="showSignIn" type="button">Sign in</button></p>
-    </form>
-  </div>
-
-  <div id="signedInApp" class="app-shell" hidden>
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">Mom's rental homes</p>
-        <h1>Rental Home</h1>
-      </div>
-      <div class="header-actions">
-        <button class="secondary-button compact" id="accountButton" type="button">Account</button>
-      </div>
-    </header>
-
-    <main id="app" tabindex="-1">
-      <section id="listView" class="view" aria-labelledby="listHeading">
-        <div class="section-heading">
-          <div>
-            <h2 id="listHeading">Your properties</h2>
-            <p id="propertyCount" class="muted"></p>
-          </div>
-          <button class="primary-button compact" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
-        </div>
-        <label class="search-box" for="searchInput">
-          <span aria-hidden="true">⌕</span>
-          <span class="sr-only">Search properties</span>
-          <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
-          <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
-        </label>
-        <div class="filter-row" aria-label="Filter properties">
-          <button class="filter-button active" type="button" data-filter="all">All</button>
-          <button class="filter-button" type="button" data-filter="occupied">Occupied</button>
-          <button class="filter-button" type="button" data-filter="vacant">Vacant</button>
-        </div>
-        <div id="propertyList" class="property-list" aria-live="polite"></div>
-      </section>
-
-      <section id="detailView" class="view" aria-labelledby="detailHeading" hidden></section>
-
-      <section id="formView" class="view" aria-labelledby="formHeading" hidden>
-        <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
-        <div class="section-heading form-title">
-          <div>
-            <p class="eyebrow" id="formEyebrow">New property</p>
-            <h2 id="formHeading">Add a home</h2>
-          </div>
-        </div>
-        <form id="propertyForm" novalidate>
-          <div id="formError" class="form-error" role="alert" hidden></div>
-          <fieldset>
-            <legend>Property details</legend>
-            <label>Street address <span class="required" aria-hidden="true">*</span>
-              <input name="address" type="text" autocomplete="street-address" required maxlength="120" placeholder="123 Main Street">
-            </label>
-            <div class="two-columns">
-              <label>City <span class="required" aria-hidden="true">*</span>
-                <input name="city" type="text" autocomplete="address-level2" required maxlength="60" placeholder="Folsom">
-              </label>
-              <label>State <span class="required" aria-hidden="true">*</span>
-                <input name="state" type="text" autocomplete="address-level1" required maxlength="2" placeholder="CA">
-              </label>
-            </div>
-            <div class="two-columns">
-              <label>ZIP code <span class="required" aria-hidden="true">*</span>
-                <input name="zip" type="text" inputmode="numeric" autocomplete="postal-code" required pattern="[0-9]{5}(-[0-9]{4})?" maxlength="10" placeholder="95630">
-              </label>
-              <label>Monthly rent
-                <input name="rent" type="number" inputmode="decimal" min="0" step="1" placeholder="2400">
-              </label>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Rental status</legend>
-            <div class="status-choice" role="radiogroup" aria-label="Rental status">
-              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>A tenant lives here</small></span></label>
-              <label class="choice-card"><input type="radio" name="status" value="vacant"><span><strong>Vacant</strong><small>Ready for a tenant</small></span></label>
-            </div>
-          </fieldset>
-          <fieldset id="tenantFields">
-            <legend>Tenant details <span class="optional">(optional for vacant homes)</span></legend>
-            <label>Tenant name
-              <input name="tenantName" type="text" autocomplete="name" maxlength="100" placeholder="Alex Johnson">
-            </label>
-            <div class="two-columns">
-              <label>Phone
-                <input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(916) 555-0123">
-              </label>
-              <label>Email
-                <input name="email" type="email" autocomplete="email" maxlength="120" placeholder="alex@example.com">
-              </label>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Notes <span class="optional">(optional)</span></legend>
-            <label for="notes" class="sr-only">Property notes</label>
-            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
-          </fieldset>
-          <div class="form-actions">
-            <button class="primary-button" type="submit">Save property</button>
-            <button class="secondary-button" type="button" data-action="cancel-form">Cancel</button>
-            <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
-          </div>
-        </form>
-      </section>
-    </main>
-
-    <div id="accountPanel" class="modal-backdrop" hidden>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
-        <button class="modal-close" type="button" data-action="close-account" aria-label="Close">×</button>
-        <h2 id="accountTitle">Your account</h2>
-        <p id="accountSummary" class="muted">Signed in.</p>
-        <div class="backup-actions">
-          <button class="primary-button" id="inviteButton" type="button">Invite someone</button>
-          <button class="secondary-button" id="backupButton" type="button">Backup &amp; restore</button>
-          <button class="secondary-button" id="legacyImportButton" type="button" hidden>Bring in homes from this phone</button>
-          <button class="danger-link" id="signOutButton" type="button">Sign out</button>
-        </div>
-      </section>
-    </div>
-
-    <div id="invitePanel" class="modal-backdrop" hidden>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle">
-        <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">×</button>
-        <h2 id="inviteTitle">Invite someone</h2>
-        <p class="muted">They will see the same properties you see. You can also just share your email and password — that works too.</p>
-        <div id="memberList" class="member-list muted"></div>
-        <form id="inviteForm" novalidate>
-          <label>Their email <span class="optional">(optional)</span>
-            <input name="email" type="email" autocomplete="off" maxlength="120" placeholder="friend@example.com">
-          </label>
-          <button class="primary-button" type="submit">Create invite link</button>
-        </form>
-        <div id="inviteResult" class="invite-result" hidden>
-          <p class="muted">Send this link or code. It works for 14 days.</p>
-          <p class="share-code" id="inviteCode"></p>
-          <button class="secondary-button" id="copyInviteButton" type="button">Copy link</button>
-        </div>
-        <div id="inviteError" class="form-error" role="alert" hidden></div>
-      </section>
-    </div>
-
-    <div id="importPanel" class="modal-backdrop" hidden>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
-        <button class="modal-close" type="button" data-action="close-import" aria-label="Close">×</button>
-        <h2 id="importTitle">Homes on this phone</h2>
-        <p id="importMessage" class="muted">We found properties saved on this phone from before accounts. Add them to your account?</p>
-        <div class="backup-actions">
-          <button class="primary-button" id="confirmImportButton" type="button">Add them to my account</button>
-          <button class="secondary-button" id="skipImportButton" type="button">Not now</button>
-        </div>
-      </section>
-    </div>
-
-    <div id="backupPanel" class="modal-backdrop" hidden>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
-        <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
-        <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Download a copy of the homes in <strong>this</strong> account. Restoring replaces the properties in your signed-in account, not other people’s.</p>
-        <div class="backup-actions">
-          <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
-          <button class="secondary-button" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <input id="restoreInput" type="file" accept="application/json,.json" hidden>
-  <script src="config.js"></script>
-  <script type="module" src="app.js"></script>
+  <p><a href="site/">Continue to RentManor</a> · <a href="app/">Open the app</a></p>
 </body>
 </html>

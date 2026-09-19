@@ -29,6 +29,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .app-shell { width: 100%; max-width: 430px; min-height: 100vh; margin: 0 auto; padding: 0 18px env(safe-area-inset-bottom); }
 .app-header { display: flex; justify-content: space-between; align-items: center; padding: calc(18px + env(safe-area-inset-top)) 0 22px; }
 .eyebrow { margin: 0 0 3px; color: var(--teal-700); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.eyebrow.tagline { letter-spacing: 0; text-transform: none; font-size: .82rem; font-weight: 650; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 0; color: var(--teal-900); font-size: 1.55rem; letter-spacing: -.025em; }
 h2 { margin-bottom: 5px; color: var(--teal-900); font-size: 1.3rem; letter-spacing: -.02em; }

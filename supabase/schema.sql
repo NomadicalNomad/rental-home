@@ -1,12 +1,13 @@
--- Rental Home — paste this entire file into the Supabase SQL editor (Dashboard → SQL → New query).
+-- RentManor (repo: rental-home) — paste this entire file into the Supabase SQL editor (Dashboard → SQL → New query).
 -- Safe-ish to re-run: functions/policies are replaced; tables are created if missing.
 --
 -- After this SQL:
 --   1. Authentication → Providers → Email: enable Email.
 --      For Mom-simple sign-up, turn OFF "Confirm email" (otherwise she must click a mail link).
 --   2. Authentication → URL configuration:
---        Site URL = https://nomadicalnomad.github.io/rental-home
---        Redirect URLs include that origin and http://localhost:8000/**
+--        Site URL = https://app.rentmanor.com
+--        Redirect URLs include that origin, https://nomadicalnomad.github.io/rental-home/app/**,
+--        and http://localhost:8000/**
 --   3. Settings → API: copy Project URL + anon public key into config.js (never the service_role key).
 
 create extension if not exists pgcrypto;

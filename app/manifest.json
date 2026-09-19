@@ -1,7 +1,7 @@
 {
-  "name": "Rental Home",
-  "short_name": "Rentals",
-  "description": "A simple, private rental property manager.",
+  "name": "RentManor",
+  "short_name": "RentManor",
+  "description": "Your rentals, held with a little dignity.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
