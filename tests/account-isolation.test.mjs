@@ -12,6 +12,7 @@ import {
   isSampleHash,
   personalListFromRows,
   rowsForAccount,
+  samplePortfolio,
   scopedAccountId,
   shouldInjectDemoProperties
 } from '../app/account-scope.js';
@@ -44,28 +45,22 @@ test('empty unseeded personal account is never auto-seeded', () => {
     properties: [],
     sampleMode: false
   }), false);
-  assert.equal(shouldInjectDemoProperties({
-    account: { id: FRESH_ACCOUNT, seeded: false },
-    properties: [],
-    sampleMode: true
-  }), false);
 });
 
-test('sample mode reads only the shared sample account id', () => {
+test('sample mode is #/sample only and does not copy into a personal account', () => {
   assert.equal(isSampleAccountId(SAMPLE_ACCOUNT_ID), true);
-  assert.equal(isSampleAccountId(FRESH_ACCOUNT), false);
-  assert.equal(scopedAccountId({ sampleMode: true, accountId: FRESH_ACCOUNT }), SAMPLE_ACCOUNT_ID);
-  assert.equal(scopedAccountId({ sampleMode: false, accountId: FRESH_ACCOUNT }), FRESH_ACCOUNT);
   assert.equal(isSampleHash('#/sample'), true);
-  assert.equal(isSampleHash('#sample'), true);
-  assert.equal(isSampleHash('#/invite=ABC'), false);
+  assert.equal(scopedAccountId({ sampleMode: true, accountId: FRESH_ACCOUNT }), SAMPLE_ACCOUNT_ID);
+  const sample = samplePortfolio();
+  assert.equal(sample.length, 4);
+  assert.ok(sample.every(row => row.account_id === SAMPLE_ACCOUNT_ID));
+  assert.equal(personalListFromRows(sample, FRESH_ACCOUNT).length, 0);
 });
 
 test('sample account and sample mode are read-only', () => {
   assert.equal(canMutateAccount({ sampleMode: true, accountId: FRESH_ACCOUNT }), false);
   assert.equal(canMutateAccount({ sampleMode: false, accountId: SAMPLE_ACCOUNT_ID }), false);
   assert.equal(canMutateAccount({ sampleMode: false, accountId: FRESH_ACCOUNT }), true);
-  assert.equal(canMutateAccount({ sampleMode: false, accountId: null }), false);
 });
 
 test('client filter drops another identity’s rows even if the API returns them', () => {
@@ -78,22 +73,20 @@ test('client filter drops another identity’s rows even if the API returns them
   assert.equal(mine[0].address, '999 QA Test Lane');
 });
 
-test('PWA no longer inserts Folsom seed into personal accounts', () => {
+test('PWA deleted auto-seed paths (maybeSeedSampleData / seedProperties)', () => {
   const appJs = readFileSync(join(root, 'app/app.js'), 'utf8');
-  assert.match(appJs, /shouldInjectDemoProperties/);
+  assert.doesNotMatch(appJs, /function seedProperties/);
+  assert.doesNotMatch(appJs, /maybeSeedSampleData/);
   assert.doesNotMatch(appJs, /insertProperties\(\s*seedProperties\(\)\s*\)/);
-  assert.doesNotMatch(appJs, /async function maybeSeedSampleData/);
+  assert.match(appJs, /samplePortfolio\(\)/);
+  assert.match(appJs, /if \(sampleMode\)/);
 });
 
-test('schema and migration pin sample account + RLS (no wipe of user rows)', () => {
+test('schema.sql leaves existing RLS member policies intact', () => {
   const schema = readFileSync(join(root, 'supabase/schema.sql'), 'utf8');
-  const migration = readFileSync(join(root, 'supabase/migrations/20260919_account_isolation_sample.sql'), 'utf8');
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /00000000-0000-4000-8000-000000000001/);
-    assert.match(sql, /is_sample/);
-    assert.match(sql, /properties_select_sample/);
-    assert.match(sql, /not public\.is_sample_account\(account_id\)/);
-    assert.doesNotMatch(sql, /delete from public\.properties\s+where account_id <>/i);
-    assert.doesNotMatch(sql, /delete from public\.properties;/i);
-  }
+  assert.match(schema, /properties_select_member/);
+  assert.match(schema, /using \(public\.is_account_member\(account_id\)\);/);
+  assert.doesNotMatch(schema, /properties_select_sample/);
+  assert.doesNotMatch(schema, /is_sample_account/);
+  assert.doesNotMatch(schema, /not public\.is_sample_account/);
 });

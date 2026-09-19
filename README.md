@@ -56,14 +56,14 @@ On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 - Restoring a JSON file **replaces properties in the signed-in account only**.
 - After sign-in, if this phone still has the old on-device list, the app offers a **one-time import** into the account.
 
-New accounts start with **zero** properties. Folsom sample homes appear only in shared sample mode at `/#/sample` (account `00000000-0000-4000-8000-000000000001`). They are never copied into a personal account.
+New accounts start with **zero** properties. Folsom sample homes appear only in shared sample mode at `/#/sample` (logical account `00000000-0000-4000-8000-000000000001`). They are never copied into a personal account. Existing RLS is unchanged — this was a client auto-seed bug, not a policy leak.
 
 ## How to configure (Damon)
 
 This app talks to **Supabase** (email/password auth + Postgres + row-level security). There are no demo logins in the repo.
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. **SQL editor:** paste and run `supabase/schema.sql` (or, on an existing project, `supabase/migrations/20260919_account_isolation_sample.sql`). That seeds the shared sample account only. It does not wipe other users’ properties.
+2. **SQL editor:** paste and run `supabase/schema.sql`. No extra isolation migration is required for this bug.
 3. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
 4. **Authentication → URL configuration:**
    - Site URL: `https://app.rentmanor.com`

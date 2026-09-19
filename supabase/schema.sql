@@ -9,10 +9,6 @@
 --        Redirect URLs include that origin, https://nomadicalnomad.github.io/rental-home/app/**,
 --        and http://localhost:8000/**
 --   3. Settings → API: copy Project URL + anon public key into config.js (never the service_role key).
---   4. Shared sample portfolio (read-only) uses account_id
---      00000000-0000-4000-8000-000000000001. Clients open it at /#/sample.
---      This SQL seeds that one account only. It does not delete or rewrite
---      any other account’s properties.
 
 create extension if not exists pgcrypto;
 
@@ -30,11 +26,6 @@ create table if not exists public.accounts (
 alter table public.accounts add column if not exists name text;
 alter table public.accounts add column if not exists seeded boolean not null default false;
 alter table public.accounts add column if not exists created_at timestamptz not null default now();
-alter table public.accounts add column if not exists is_sample boolean not null default false;
-
-create unique index if not exists accounts_one_sample_idx
-  on public.accounts (is_sample)
-  where is_sample;
 
 create table if not exists public.account_members (
   account_id uuid not null references public.accounts(id) on delete cascade,
@@ -77,48 +68,6 @@ create table if not exists public.properties (
 
 create index if not exists properties_account_id_idx on public.properties (account_id);
 create index if not exists properties_account_updated_idx on public.properties (account_id, updated_at desc);
-
--- Shared read-only sample. Idempotent. Does not touch other accounts.
-insert into public.accounts (id, name, seeded, is_sample)
-values ('00000000-0000-4000-8000-000000000001', 'Sample homes', true, true)
-on conflict (id) do update
-  set is_sample = true,
-      seeded = true,
-      name = excluded.name;
-
-insert into public.properties (
-  id, account_id, address, city, state, zip, status,
-  tenant_name, phone, email, rent, notes
-) values
-  (
-    '10000000-0000-4000-8000-000000000001',
-    '00000000-0000-4000-8000-000000000001',
-    '1124 Iron Point Road', 'Folsom', 'CA', '95630', 'occupied',
-    'Maria Hernandez', '(916) 555-0148', 'maria.h@example.com', '2450',
-    'Renewal conversation in October.'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000002',
-    '00000000-0000-4000-8000-000000000001',
-    '704 Blue Ravine Road', 'Folsom', 'CA', '95630', 'vacant',
-    '', '', '', '2200',
-    'Fresh paint completed in the living room.'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000003',
-    '00000000-0000-4000-8000-000000000001',
-    '1538 East Bidwell Street', 'Folsom', 'CA', '95630', 'occupied',
-    'James Wilson', '(916) 555-0196', 'james.wilson@example.com', '2750',
-    'Two-car garage; gardener included.'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000004',
-    '00000000-0000-4000-8000-000000000001',
-    '889 Sibley Street', 'Folsom', 'CA', '95630', 'vacant',
-    '', '', '', '1950',
-    ''
-  )
-on conflict (id) do nothing;
 
 create table if not exists public.account_invites (
   id uuid primary key default gen_random_uuid(),
@@ -167,22 +116,6 @@ as $$
       and user_id = auth.uid()
       and role = 'owner'
   );
-$$;
-
-create or replace function public.is_sample_account(aid uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select aid = '00000000-0000-4000-8000-000000000001'::uuid
-    or exists (
-      select 1
-      from public.accounts
-      where id = aid
-        and is_sample = true
-    );
 $$;
 
 create or replace function public.current_user_email()
@@ -249,7 +182,7 @@ begin
     limit 1;
   end if;
 
-  if pending.id is not null and not public.is_sample_account(pending.account_id) then
+  if pending.id is not null then
     insert into public.account_members (account_id, user_id, role, email)
     values (pending.account_id, new.id, 'member', coalesce(new.email, ''))
     on conflict (account_id, user_id) do nothing;
@@ -305,7 +238,6 @@ begin
     and i.expires_at > now()
     and i.email is not null
     and lower(i.email) = lower(user_email)
-    and not public.is_sample_account(i.account_id)
   on conflict (account_id, user_id) do nothing;
 
   update public.account_invites i
@@ -339,12 +271,10 @@ begin
 
   perform public.claim_pending_invites();
 
-  select m.account_id into aid
-  from public.account_members m
-  join public.accounts a on a.id = m.account_id
-  where m.user_id = uid
-    and coalesce(a.is_sample, false) = false
-  order by m.created_at asc
+  select account_id into aid
+  from public.account_members
+  where user_id = uid
+  order by created_at asc
   limit 1;
 
   if aid is not null then
@@ -435,10 +365,6 @@ begin
     raise exception 'Only the account owner can invite someone';
   end if;
 
-  if public.is_sample_account(aid) then
-    raise exception 'Sample account is read-only';
-  end if;
-
   clean_email := nullif(trim(lower(coalesce(invite_email, ''))), '');
   new_token := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
 
@@ -481,10 +407,6 @@ begin
     raise exception 'That invite has expired';
   end if;
 
-  if public.is_sample_account(invite.account_id) then
-    raise exception 'Sample account is read-only';
-  end if;
-
   if invite.email is not null
      and invite.email <> ''
      and user_email is not null
@@ -517,10 +439,6 @@ as $$
 begin
   if not public.is_account_member(target_account) then
     raise exception 'Not allowed';
-  end if;
-
-  if public.is_sample_account(target_account) then
-    raise exception 'Sample account is read-only';
   end if;
 
   if payload is null or jsonb_typeof(payload) <> 'array' then
@@ -566,9 +484,6 @@ begin
   if not public.is_account_member(target_account) then
     raise exception 'Not allowed';
   end if;
-  if public.is_sample_account(target_account) then
-    raise exception 'Sample account is read-only';
-  end if;
   update public.accounts set seeded = true where id = target_account;
 end;
 $$;
@@ -576,7 +491,6 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- A signed-in user only reads/writes rows for accounts they belong to.
--- Shared sample: SELECT for anon + authenticated; no client writes.
 -- Invites: owners create; acceptor joins via accept_invite() (security definer).
 -- ---------------------------------------------------------------------------
 
@@ -591,24 +505,18 @@ create policy accounts_select_member
   to authenticated
   using (public.is_account_member(id));
 
-drop policy if exists accounts_select_sample on public.accounts;
-create policy accounts_select_sample
-  on public.accounts for select
-  to anon, authenticated
-  using (public.is_sample_account(id));
-
 drop policy if exists accounts_update_member on public.accounts;
 create policy accounts_update_member
   on public.accounts for update
   to authenticated
-  using (public.is_account_member(id) and not public.is_sample_account(id))
-  with check (public.is_account_member(id) and not public.is_sample_account(id));
+  using (public.is_account_member(id))
+  with check (public.is_account_member(id));
 
 drop policy if exists members_select_peer on public.account_members;
 create policy members_select_peer
   on public.account_members for select
   to authenticated
-  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+  using (public.is_account_member(account_id));
 
 drop policy if exists properties_select_member on public.properties;
 create policy properties_select_member
@@ -616,30 +524,24 @@ create policy properties_select_member
   to authenticated
   using (public.is_account_member(account_id));
 
-drop policy if exists properties_select_sample on public.properties;
-create policy properties_select_sample
-  on public.properties for select
-  to anon, authenticated
-  using (public.is_sample_account(account_id));
-
 drop policy if exists properties_insert_member on public.properties;
 create policy properties_insert_member
   on public.properties for insert
   to authenticated
-  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+  with check (public.is_account_member(account_id));
 
 drop policy if exists properties_update_member on public.properties;
 create policy properties_update_member
   on public.properties for update
   to authenticated
-  using (public.is_account_member(account_id) and not public.is_sample_account(account_id))
-  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+  using (public.is_account_member(account_id))
+  with check (public.is_account_member(account_id));
 
 drop policy if exists properties_delete_member on public.properties;
 create policy properties_delete_member
   on public.properties for delete
   to authenticated
-  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+  using (public.is_account_member(account_id));
 
 drop policy if exists invites_select_owner on public.account_invites;
 create policy invites_select_owner
@@ -660,15 +562,12 @@ create policy invites_delete_owner
 grant usage on schema public to anon, authenticated;
 
 grant select, update on public.accounts to authenticated;
-grant select on public.accounts to anon;
 grant select on public.account_members to authenticated;
 grant select, insert, update, delete on public.properties to authenticated;
-grant select on public.properties to anon;
 grant select, delete on public.account_invites to authenticated;
 
 revoke all on function public.is_account_member(uuid) from public;
 revoke all on function public.is_account_owner(uuid) from public;
-revoke all on function public.is_sample_account(uuid) from public;
 revoke all on function public.current_user_email() from public;
 revoke all on function public.claim_pending_invites() from public;
 revoke all on function public.ensure_my_account() from public;
@@ -680,7 +579,6 @@ revoke all on function public.mark_account_seeded(uuid) from public;
 
 grant execute on function public.is_account_member(uuid) to authenticated;
 grant execute on function public.is_account_owner(uuid) to authenticated;
-grant execute on function public.is_sample_account(uuid) to anon, authenticated;
 grant execute on function public.current_user_email() to authenticated;
 grant execute on function public.claim_pending_invites() to authenticated;
 grant execute on function public.ensure_my_account() to authenticated;

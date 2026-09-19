@@ -1,4 +1,5 @@
 /* Auth + account + invite for RentManor (vanilla PWA, Supabase). */
+import { isSampleAccountId } from './account-scope.js';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/+esm';
 const INVITE_STORAGE_KEY = 'rental-home-invite-token';
 const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';
@@ -189,40 +190,32 @@ async function rpc(name, args = {}) {
 }
 
 async function loadMemberships(user) {
-  const withSample = await supabase
-    .from('account_members')
-    .select('account_id, role, email, created_at, accounts ( id, name, seeded, is_sample, created_at )')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true });
-  if (!withSample.error) return withSample.data || [];
-  const message = String(withSample.error.message || '');
-  if (!/is_sample|schema cache|column/i.test(message)) throw withSample.error;
-  const fallback = await supabase
+  const { data, error } = await supabase
     .from('account_members')
     .select('account_id, role, email, created_at, accounts ( id, name, seeded, created_at )')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true });
-  if (fallback.error) throw fallback.error;
-  return fallback.data || [];
+  if (error) throw error;
+  return data || [];
 }
 
 function pickAccount(memberships, preferredId) {
-  const personal = (memberships || []).filter(row => !row.accounts?.is_sample);
-  if (!personal.length) return null;
+  if (!memberships.length) return null;
   if (preferredId) {
-    const match = personal.find(row => row.account_id === preferredId);
+    const match = memberships.find(row => row.account_id === preferredId);
     if (match) return match;
   }
-  return personal.find(row => row.role === 'owner') || personal[0];
+  return memberships.find(row => row.role === 'owner') || memberships[0];
 }
 
 function toAccount(row) {
   if (!row) return null;
+  const id = row.accounts?.id || row.account_id;
   return {
-    id: row.accounts?.id || row.account_id,
+    id,
     name: row.accounts?.name || 'Your account',
     seeded: Boolean(row.accounts?.seeded),
-    isSample: Boolean(row.accounts?.is_sample),
+    isSample: isSampleAccountId(id),
     role: row.role
   };
 }

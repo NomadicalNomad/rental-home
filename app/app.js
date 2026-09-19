@@ -3,6 +3,7 @@ import {
   canMutateAccount,
   isSampleHash,
   rowsForAccount,
+  samplePortfolio,
   scopedAccountId,
   shouldInjectDemoProperties,
   sampleWriteError
@@ -169,6 +170,10 @@ function readBackupFile(text) {
 }
 
 async function loadProperties() {
+  if (sampleMode) {
+    properties = samplePortfolio().map(fromRow);
+    return;
+  }
   const supabase = getSupabase();
   const accountId = activeAccountId();
   if (!supabase || !accountId) {
