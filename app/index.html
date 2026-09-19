@@ -63,6 +63,7 @@
       </label>
       <button class="primary-button" type="submit">Sign in</button>
       <p class="auth-switch">New here? <button class="text-button" id="showSignUp" type="button">Create an account</button></p>
+      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample portfolio</button></p>
     </form>
 
     <form id="signUpForm" class="auth-card" novalidate hidden>
@@ -83,17 +84,28 @@
       </label>
       <button class="primary-button" type="submit">Create account</button>
       <p class="auth-switch">Already have an account? <button class="text-button" id="showSignIn" type="button">Sign in</button></p>
+      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample portfolio</button></p>
     </form>
   </div>
 
   <div id="signedInApp" class="app-shell" hidden>
+    <div id="sampleBanner" class="sample-banner" hidden>
+      <div>
+        <strong>SAMPLE · Read only</strong>
+        <p>Example homes. You can’t change anything.</p>
+      </div>
+      <div class="sample-banner-actions">
+        <button class="secondary-button compact" id="exitSampleAccount" type="button">My account</button>
+        <button class="secondary-button compact" id="exitSampleSignIn" type="button">Sign in</button>
+        <button class="primary-button compact" id="exitSampleSignUp" type="button">Create account</button>
+      </div>
+    </div>
     <header class="app-header">
       <div>
-        <p class="eyebrow tagline">Your properties. Your people.</p>
         <h1>RentManor</h1>
       </div>
       <div class="header-actions">
-        <button class="secondary-button compact" id="accountButton" type="button">Account</button>
+        <button class="secondary-button compact js-write" id="accountButton" type="button">Account</button>
       </div>
     </header>
 
@@ -104,15 +116,15 @@
             <h2 id="listHeading">Your properties</h2>
             <p id="propertyCount" class="muted"></p>
           </div>
-          <button class="primary-button compact" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
+          <button class="primary-button compact js-write" id="addButton" type="button"><span aria-hidden="true">＋</span> Add home</button>
         </div>
-        <label class="search-box" for="searchInput">
+        <label class="search-box" id="searchBox" for="searchInput">
           <span aria-hidden="true">⌕</span>
           <span class="sr-only">Search properties</span>
           <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
           <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
         </label>
-        <div class="filter-row" aria-label="Filter properties">
+        <div class="filter-row" id="filterRow" aria-label="Filter properties">
           <button class="filter-button active" type="button" data-filter="all">All</button>
           <button class="filter-button" type="button" data-filter="occupied">Occupied</button>
           <button class="filter-button" type="button" data-filter="vacant">Vacant</button>
@@ -121,6 +133,7 @@
       </section>
 
       <section id="detailView" class="view" aria-labelledby="detailHeading" hidden></section>
+      <section id="expenseView" class="view" aria-labelledby="expenseHeading" hidden></section>
 
       <section id="formView" class="view" aria-labelledby="formHeading" hidden>
         <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
@@ -180,10 +193,17 @@
             <label for="notes" class="sr-only">Property notes</label>
             <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
           </fieldset>
-          <div class="form-actions">
+          <fieldset class="js-write">
+            <legend>Photo <span class="optional">(optional)</span></legend>
+            <button class="hero-photo compact" id="formPhotoTile" type="button" data-action="form-photo">
+              <span class="hero-empty"><span aria-hidden="true">⌂</span> Add photo</span>
+            </button>
+            <div id="formPhotoError" class="form-error" role="alert" hidden></div>
+          </fieldset>
+          <div class="form-actions sticky">
             <button class="primary-button" type="submit">Save property</button>
             <button class="secondary-button" type="button" data-action="cancel-form">Cancel</button>
-            <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
+            <button class="danger-link js-write" id="deleteButton" type="button" hidden>Delete property</button>
           </div>
         </form>
       </section>
@@ -236,6 +256,31 @@
       </section>
     </div>
 
+    <div id="photoSheet" class="modal-backdrop" hidden>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="photoSheetTitle">
+        <h2 id="photoSheetTitle">Property photo</h2>
+        <button class="sheet-row js-write" type="button" data-photo="camera">Take photo</button>
+        <button class="sheet-row js-write" type="button" data-photo="library">Choose from library</button>
+        <button class="sheet-row danger js-write" id="removePhotoButton" type="button" data-photo="remove" hidden>Remove photo</button>
+        <button class="sheet-row" type="button" data-action="close-photo-sheet">Cancel</button>
+      </section>
+    </div>
+
+    <div id="receiptSheet" class="modal-backdrop" hidden>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="receiptSheetTitle">
+        <h2 id="receiptSheetTitle">Add receipt</h2>
+        <button class="sheet-row js-write" type="button" data-receipt="camera">Take photo</button>
+        <button class="sheet-row js-write" type="button" data-receipt="library">Choose photo</button>
+        <button class="sheet-row js-write" type="button" data-receipt="pdf">Upload PDF</button>
+        <button class="sheet-row" type="button" data-action="close-receipt-sheet">Cancel</button>
+      </section>
+    </div>
+
+    <div id="lightbox" class="lightbox" hidden>
+      <button class="lightbox-close" type="button" data-action="close-lightbox">Close</button>
+      <img id="lightboxImage" alt="">
+    </div>
+
     <div id="backupPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
         <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
@@ -251,6 +296,11 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <input id="restoreInput" type="file" accept="application/json,.json" hidden>
+  <input id="photoCameraInput" type="file" accept="image/*" capture="environment" hidden>
+  <input id="photoLibraryInput" type="file" accept="image/*" hidden>
+  <input id="receiptCameraInput" type="file" accept="image/*" capture="environment" hidden>
+  <input id="receiptLibraryInput" type="file" accept="image/*" hidden>
+  <input id="receiptPdfInput" type="file" accept="application/pdf,.pdf" hidden>
   <script src="config.js"></script>
   <script type="module" src="app.js"></script>
 </body>

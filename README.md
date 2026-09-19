@@ -23,9 +23,11 @@ Until DNS is live, GitHub Pages still works:
 1. Open the app in Safari (or a desktop browser): https://app.rentmanor.com/ (or the github.io `/app/` URL above).
 2. Tap **Create an account**.
 3. Enter an email and a password (at least 6 characters).
-4. You land on **Your properties**. Those homes belong only to this account.
+4. You land on **Your properties**. A new account starts empty — add your first rental when you are ready.
 
 It is okay if Mom and a helper both use the **same email and password**. That is the simplest way to share.
+
+To see how the app looks with example homes, tap **View sample portfolio** (or open `/#/sample`). The sample is shared and read-only. It is not copied into your account.
 
 ## Invite / share
 
@@ -55,22 +57,49 @@ On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 - **Account → Backup & restore** downloads a JSON file of the signed-in account.
 - Restoring a JSON file **replaces properties in the signed-in account only**.
 - After sign-in, if this phone still has the old on-device list, the app offers a **one-time import** into the account.
+- JSON backups cover properties. Photos and receipts stay in private Storage; a full media zip is out of scope for v1.
 
-Sample Folsom homes are added only for a brand-new empty account (not on every sign-in).
+## Sample portfolio
+
+Anyone can open the shared demo without signing in:
+
+- App: https://app.rentmanor.com/#/sample
+- GitHub Pages: https://nomadicalnomad.github.io/rental-home/app/#/sample
+
+It uses the fixed sample account `00000000-0000-4000-8000-000000000001` (`accounts.is_sample = true`). Clients can only **read** that account. There is no “load sample into my account” button.
+
+## Photos, expenses, receipts
+
+On a property you own:
+
+- Add, replace, or remove one primary photo (camera or library). It shows on the list and the detail screen.
+- Track expenses (date, amount, category, notes) with a simple year total.
+- Attach one receipt per expense — camera, photo library, or PDF — then view or remove it.
+
+Photos and receipts live in the private `account-media` bucket:
+
+- Thumbnail: `{account_id}/properties/{property_id}/thumbnail` (+ extension)
+- Receipt: `{account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}` (+ extension)
 
 ## How to configure (Damon)
 
 This app talks to **Supabase** (email/password auth + Postgres + row-level security). There are no demo logins in the repo.
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. **SQL editor:** paste and run `supabase/schema.sql`.
-3. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
-4. **Authentication → URL configuration:**
+2. **SQL editor:** paste and run `supabase/schema.sql` (full setup). If this project already ran an older schema, run `supabase/migrations/20260919_photos_expenses_sample.sql` instead. Either file seeds the shared sample account and does **not** wipe personal accounts.
+3. **Storage:** confirm a **private** bucket named `account-media` exists (the SQL tries to create it). If the insert was skipped:
+   1. Dashboard → **Storage → New bucket**
+   2. Name: `account-media`
+   3. Public: **off**
+   4. Re-run the SQL so the path policies attach
+4. **Optional sample media:** upload files from `supabase/sample-media/` into `account-media` using the `storage_path` values in the migration (thumbnail + receipt objects under `00000000-0000-4000-8000-000000000001/`). The app also ships the same files as a sample-only fallback if an object is missing.
+5. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
+6. **Authentication → URL configuration:**
    - Site URL: `https://app.rentmanor.com`
    - Redirect URLs: that origin, `https://nomadicalnomad.github.io/rental-home/app/**`, and `http://localhost:8000/**`
-5. **Settings → API:** copy **Project URL** and the **anon public** key. Never copy `service_role`.
-6. `cp app/config.example.js app/config.js` and paste those two values. Same names are listed in `.env.example`.
-7. GitHub Pages only serves committed files. Because the anon key is public (RLS is what protects data), add `app/config.js` with:
+7. **Settings → API:** copy **Project URL** and the **anon public** key. Never copy `service_role`.
+8. `cp app/config.example.js app/config.js` and paste those two values. Same names are listed in `.env.example`.
+9. GitHub Pages only serves committed files. Because the anon key is public (RLS is what protects data), add `app/config.js` with:
 
    ```bash
    git add -f app/config.js
@@ -78,7 +107,7 @@ This app talks to **Supabase** (email/password auth + Postgres + row-level secur
    git push
    ```
 
-8. Reload the app URL. You should see **Sign in / Create account**, not “This copy isn’t connected yet”.
+10. Reload the app URL. You should see **Sign in / Create account**, not “This copy isn’t connected yet”. Then open `/#/sample` to confirm the shared portfolio loads.
 
 `.gitignore` ignores `.env`, `config.js`, and `config.local.js`. Do not commit `service_role`.
 
@@ -87,9 +116,11 @@ Production `app/index.html` also inlines the same public `window.RENTAL_HOME_CON
 ## Files
 
 - `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms)
-- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `manifest.json`, `sw.js`, `icons/`, `config.js`)
+- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `media.js`, `manifest.json`, `sw.js`, `icons/`, `sample-media/`, `config.js`)
 - `app/config.example.js`, `.env.example` — how to point the PWA at Supabase
-- `supabase/schema.sql` — tables, RLS, invite functions
+- `supabase/schema.sql` — tables, RLS, invite functions, sample seed, storage policies
+- `supabase/migrations/20260919_photos_expenses_sample.sql` — incremental SQL if the older schema is already applied
+- `supabase/sample-media/` — optional upload set for the shared sample bucket prefix
 - `netlify.toml` — host-based routing (`site/` on apex, `app/` on `app.`)
 - `docs/DNS-GODADDY.md` — exact GoDaddy records Damon must add
 - `rental-home.code-workspace` — VS Code / Cursor workspace
@@ -106,6 +137,7 @@ Open:
 
 - http://localhost:8000/site/ — marketing
 - http://localhost:8000/app/ — app (a static server is needed for the service worker; it won’t register from `file://`)
+- http://localhost:8000/app/#/sample — shared read-only sample
 
 Without `config.js` *and* without the inline production values, the app shows a clear setup message and does not invent credentials.
 
@@ -116,4 +148,4 @@ Without `config.js` *and* without the inline production values, the app shows a 
 
 ## Privacy
 
-Tenant contact info lives in your Supabase project, isolated per account by RLS. Treat JSON backups like any file with tenant contact info.
+Tenant contact info, photos, and receipts live in your Supabase project, isolated per account by RLS. The sample portfolio is a separate read-only account. Treat JSON backups like any file with tenant contact info.

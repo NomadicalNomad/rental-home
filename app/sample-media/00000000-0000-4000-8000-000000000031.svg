@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="860" viewBox="0 0 640 860" role="img" aria-label="Sample HVAC receipt">
+  <rect width="640" height="860" fill="#f8faf9"/>
+  <rect x="40" y="40" width="560" height="780" fill="#ffffff" stroke="#d8e4e1"/>
+  <text x="320" y="110" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#134e4a">Sample receipt</text>
+  <text x="80" y="180" font-family="system-ui, sans-serif" font-size="18" fill="#172a2a">HVAC filter</text>
+  <text x="80" y="220" font-family="system-ui, sans-serif" font-size="16" fill="#5f7070">Sep 12, 2026 · Repairs</text>
+  <text x="80" y="280" font-family="system-ui, sans-serif" font-size="28" fill="#0f766e">$84.00</text>
+  <text x="80" y="340" font-family="system-ui, sans-serif" font-size="14" fill="#5f7070">Example only. Not a real store receipt.</text>
+</svg>

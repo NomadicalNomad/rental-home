@@ -192,10 +192,12 @@ img { max-width: 100%; }
   margin-top: 36px;
   padding-top: 8px;
 }
-.a2hs-nudge {
+.a2hs-nudge, .sample-nudge {
   margin: 22px 0 36px;
   color: var(--muted);
 }
+.sample-nudge { margin-top: 14px; }
+.sample-nudge a { font-weight: 700; }
 .a2hs-list {
   margin: 0 0 18px;
   padding-left: 1.2rem;

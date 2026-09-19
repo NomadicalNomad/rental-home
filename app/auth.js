@@ -4,6 +4,9 @@ const INVITE_STORAGE_KEY = 'rental-home-invite-token';
 const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';
 const PLACEHOLDER_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
+export const SAMPLE_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
+const SAMPLE_HASH = /^#?\/?sample\/?$/i;
+
 let supabase = null;
 let currentUser = null;
 let currentAccount = null;
@@ -81,6 +84,9 @@ export function friendlyError(error) {
   if (message.includes('schema cache') || message.includes('does not exist') || message.includes('could not find the function') || message.includes('could not find the table')) {
     return 'This project isn’t finished setting up. Paste supabase/schema.sql into the Supabase SQL editor, then try again.';
   }
+  if (message.includes('bucket') || message.includes('storage') || message.includes('payload too large') || message.includes('maximum allowed size')) {
+    return 'Couldn’t save that file. Try a smaller photo or PDF, or finish the Storage setup in the README.';
+  }
   if (message.includes('failed to fetch') || message.includes('network') || message.includes('fetch')) {
     return 'Could not connect. Check your internet and try again.';
   }
@@ -136,7 +142,34 @@ export function showScreen(name) {
   showEl('#signedInApp', name === 'app');
 }
 
-function showAuthMode(mode) {
+let pendingAuthMode = null;
+
+export function isSampleRoute() {
+  const hash = (location.hash || '').replace(/^#/, '').replace(/^\/+|\/+$/g, '');
+  return SAMPLE_HASH.test(hash);
+}
+
+export function enterSampleRoute() {
+  if (!isSampleRoute()) location.hash = '/sample';
+}
+
+export function exitSampleRoute() {
+  if (!isSampleRoute()) return;
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
+export function requestAuthMode(mode) {
+  pendingAuthMode = mode === 'signup' ? 'signup' : 'signin';
+}
+
+function consumePendingAuthMode() {
+  const mode = pendingAuthMode;
+  pendingAuthMode = null;
+  return mode;
+}
+
+export function showAuthMode(mode) {
   const signIn = document.querySelector('#signInForm');
   const signUp = document.querySelector('#signUpForm');
   if (signIn) signIn.hidden = mode !== 'signin';
@@ -451,34 +484,69 @@ export async function startAuth(callback) {
   await refreshInviteBanner();
 
   let sessionJob = Promise.resolve();
+  let lastNotice = '';
   const queueSession = (event, session) => {
     if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') return;
     sessionJob = sessionJob.then(() => applySession(event, session)).catch(() => {});
   };
 
   async function applySession(event, session) {
-    if (!session) {
+    if (session) {
+      const needAccount = !currentUser || currentUser.id !== session.user.id || !currentAccount;
+      if (needAccount && (!event || event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'hash')) {
+        currentUser = session.user;
+        if (!isSampleRoute()) showScreen('loading');
+        try {
+          const { inviteWarning } = await establishAccount(session.user);
+          lastNotice = inviteWarning ? friendlyError(inviteWarning) : '';
+        } catch (error) {
+          if (!isSampleRoute()) {
+            showScreen('auth');
+            setAuthError(friendlyError(error));
+            return;
+          }
+        }
+      }
+    } else {
       currentUser = null;
       currentAccount = null;
-      showAuthMode('signin');
+      currentMemberships = [];
+    }
+
+    if (isSampleRoute()) {
+      showScreen('app');
+      if (authCallback) {
+        await authCallback({
+          status: 'sample',
+          user: currentUser,
+          account: currentAccount,
+          supabase
+        });
+      }
+      return;
+    }
+
+    if (!session) {
+      showAuthMode(consumePendingAuthMode() || 'signin');
       await refreshInviteBanner();
       showScreen('auth');
       await emitSignedOut();
       return;
     }
-    if (event && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') return;
-    if (currentUser?.id === session.user.id && currentAccount) return;
-    currentUser = session.user;
-    showScreen('loading');
-    try {
-      const { inviteWarning } = await establishAccount(session.user);
-      showScreen('app');
-      await emitSignedIn(inviteWarning ? friendlyError(inviteWarning) : '');
-    } catch (error) {
-      showScreen('auth');
-      setAuthError(friendlyError(error));
-    }
+
+    if (event && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN' && event !== 'hash') return;
+
+    showScreen('app');
+    await emitSignedIn(lastNotice);
+    lastNotice = '';
   }
+
+  window.addEventListener('hashchange', () => {
+    sessionJob = sessionJob.then(async () => {
+      const { data } = await supabase.auth.getSession();
+      await applySession('hash', data?.session || null);
+    }).catch(() => {});
+  });
 
   supabase.auth.onAuthStateChange((event, session) => {
     queueSession(event, session);

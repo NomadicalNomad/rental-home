@@ -72,6 +72,7 @@
           <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
           <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Already have one? Sign in</a>
         </div>
+        <p class="sample-nudge"><a data-sample-cta href="https://app.rentmanor.com/#/sample">View sample</a> — look around a demo portfolio. Nothing to sign in for.</p>
       </section>
     </div>
   </main>
@@ -93,9 +94,12 @@
   </footer>
   <script>
     (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      var appBase = 'https://app.rentmanor.com/';
+      if (/\.github\.io$/i.test(location.hostname)) {
+        appBase = 'https://nomadicalnomad.github.io/rental-home/app/';
+      }
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = appBase; });
+      document.querySelectorAll('[data-sample-cta]').forEach(function (a) { a.href = appBase + '#/sample'; });
     })();
   </script>
 </body>
