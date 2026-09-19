@@ -144,7 +144,7 @@
         ${property.status === 'occupied' && property.tenantName ? `<p class="muted">Tenant: <strong>${escapeHTML(property.tenantName)}</strong></p>` : ''}
       </div>
       <div class="detail-grid">
-        ${property.status === 'occupied' ? `<div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div></div>` : ''}
+        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
         ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
         ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
       </div>
