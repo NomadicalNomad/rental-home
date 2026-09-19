@@ -1,4 +1,4 @@
-/* Copy this file to config.js and fill in your Supabase project values.
+/* Copy this file to app/config.js and fill in your Supabase project values.
  *
  * The anon key is safe to ship in a static PWA because Row Level Security
  * (see supabase/schema.sql) blocks cross-account reads. Never put the

@@ -8,3 +8,4 @@ Thumbs.db
 !.env.example
 config.js
 config.local.js
+app/config.local.js

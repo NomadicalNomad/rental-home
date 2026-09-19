@@ -1,4 +1,4 @@
-/* Rental Home — per-account property manager (Supabase-backed). */
+/* RentManor — per-account property manager (Supabase-backed). */
 import {
   startAuth,
   getSupabase,
@@ -209,7 +209,7 @@ function renderList() {
 
   if (!matches.length) {
     const hasProperties = properties.length > 0;
-    propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">${hasProperties ? '⌕' : '⌂'}</div><h3>${hasProperties ? 'No homes found' : 'No properties yet'}</h3><p>${hasProperties ? 'Try a different search or filter.' : 'Add your first rental home to get started.'}</p>${hasProperties ? '<button class="secondary-button" type="button" data-action="clear-filters">Clear search</button>' : '<button class="primary-button" type="button" data-action="add">Add a home</button>'}</div>`;
+    propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">${hasProperties ? '⌕' : '⌂'}</div><h3>${hasProperties ? 'No homes found' : 'No properties yet'}</h3><p>${hasProperties ? 'Try a different search or filter.' : 'Add your first rental.'}</p>${hasProperties ? '<button class="secondary-button" type="button" data-action="clear-filters">Clear search</button>' : '<button class="primary-button" type="button" data-action="add">Add a home</button>'}</div>`;
     return;
   }
 
@@ -347,12 +347,12 @@ function closeModals() {
 }
 
 function downloadBackup() {
-  const payload = { app: 'Rental Home', version: 1, exportedAt: new Date().toISOString(), properties };
+  const payload = { app: 'RentManor', version: 1, exportedAt: new Date().toISOString(), properties };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `rental-home-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `rentmanor-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();

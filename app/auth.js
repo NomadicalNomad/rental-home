@@ -1,4 +1,4 @@
-/* Auth + account + invite for Rental Home (vanilla PWA, Supabase). */
+/* Auth + account + invite for RentManor (vanilla PWA, Supabase). */
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/+esm';
 const INVITE_STORAGE_KEY = 'rental-home-invite-token';
 const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';

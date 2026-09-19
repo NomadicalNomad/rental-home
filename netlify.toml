@@ -1,0 +1,59 @@
+# One Netlify site, publish the repo root.
+# After Damon adds the custom domains in Netlify, these host rules split traffic:
+#   rentmanor.com (+ www → apex) → site/
+#   app.rentmanor.com             → app/
+#
+# Until DNS is live, the default *.netlify.app URL still serves both folders:
+#   /site/  marketing
+#   /app/   PWA
+#
+# GitHub Pages fallback (no host routing): same paths under
+#   https://nomadicalnomad.github.io/rental-home/
+
+[build]
+  publish = "."
+  command = ""
+
+# www → apex
+[[redirects]]
+  from = "https://www.rentmanor.com/*"
+  to = "https://rentmanor.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.rentmanor.com/"
+  to = "https://rentmanor.com/"
+  status = 301
+  force = true
+
+# App host → PWA folder (URL stays on app.rentmanor.com)
+[[redirects]]
+  from = "https://app.rentmanor.com/*"
+  to = "/app/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://app.rentmanor.com/"
+  to = "/app/"
+  status = 200
+  force = true
+
+# Apex → marketing folder (URL stays on rentmanor.com)
+[[redirects]]
+  from = "https://rentmanor.com/*"
+  to = "/site/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://rentmanor.com/"
+  to = "/site/"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/app/config.js"
+  [headers.values]
+    Cache-Control = "no-store"
