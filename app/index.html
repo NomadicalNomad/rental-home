@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -7,7 +7,7 @@
   <meta name="description" content="Your properties. Your people.">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
   <title>RentManor</title>
   <script>
@@ -23,7 +23,7 @@
   <div id="loadingView" class="app-shell screen-center" hidden>
     <p class="eyebrow tagline">Your properties. Your people.</p>
     <h1>RentManor</h1>
-    <p class="muted">Opening…</p>
+    <p class="muted">Openingâ€¦</p>
   </div>
 
   <div id="setupView" class="app-shell" hidden>
@@ -34,9 +34,9 @@
       </div>
     </header>
     <section class="auth-card">
-      <h2>This copy isn’t connected yet</h2>
+      <h2>This copy isnâ€™t connected yet</h2>
       <p id="setupDetail" class="muted">Add a <strong>config.js</strong> file with your project URL and anon key, then reload. See the README for the exact steps.</p>
-      <p class="muted">Until that file is in place, nobody can create an account or see properties. That is on purpose — there are no leftover demo logins.</p>
+      <p class="muted">Until that file is in place, nobody can create an account or see properties. That is on purpose â€” there are no leftover demo logins.</p>
     </section>
   </div>
 
@@ -54,7 +54,7 @@
     <form id="signInForm" class="auth-card" novalidate>
       <div class="js-auth-error form-error" role="alert" hidden></div>
       <h2>Welcome back</h2>
-      <p class="muted">Use the email and password for your account. It’s okay if more than one person uses the same sign-in.</p>
+      <p class="muted">Use the email and password for your account. Itâ€™s okay if more than one person uses the same sign-in.</p>
       <label>Email
         <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
       </label>
@@ -91,8 +91,8 @@
   <div id="signedInApp" class="app-shell" hidden>
     <div id="sampleBanner" class="sample-banner" hidden>
       <div>
-        <strong>SAMPLE · Read only</strong>
-        <p>Example homes. You can’t change anything.</p>
+        <strong>SAMPLE Â· Read only</strong>
+        <p>Example homes. You canâ€™t change anything.</p>
       </div>
       <div class="sample-banner-actions">
         <button class="secondary-button compact" id="exitSampleAccount" type="button">Back to my account</button>
@@ -119,10 +119,10 @@
           <button class="primary-button compact js-write" id="addButton" type="button">+ Add home</button>
         </div>
         <label class="search-box" id="searchBox" for="searchInput" hidden>
-          <span aria-hidden="true">⌕</span>
+          <span aria-hidden="true">âŒ•</span>
           <span class="sr-only">Search properties</span>
           <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
-          <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+          <button id="clearSearch" type="button" aria-label="Clear search" hidden>Ã—</button>
         </label>
         <div class="filter-row" id="filterRow" aria-label="Filter properties" hidden>
           <button class="filter-button active" type="button" data-filter="all">All</button>
@@ -136,7 +136,7 @@
       <section id="expenseView" class="view" aria-labelledby="expenseHeading" hidden></section>
 
       <section id="formView" class="view" aria-labelledby="formHeading" hidden>
-        <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
+        <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">â€¹</span> Back to properties</button>
         <div class="section-heading form-title">
           <div>
             <p class="eyebrow" id="formEyebrow">New property</p>
@@ -191,12 +191,12 @@
           <fieldset>
             <legend>Notes <span class="optional">(optional)</span></legend>
             <label for="notes" class="sr-only">Property notes</label>
-            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
+            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, remindersâ€¦"></textarea>
           </fieldset>
           <fieldset class="js-write">
             <legend>Photo <span class="optional">(optional)</span></legend>
             <button class="hero-photo compact" id="formPhotoTile" type="button" data-action="form-photo">
-              <span class="hero-empty"><span aria-hidden="true">⌂</span> Add photo</span>
+              <span class="hero-empty"><span aria-hidden="true">âŒ‚</span> Add photo</span>
             </button>
             <div id="formPhotoError" class="form-error" role="alert" hidden></div>
           </fieldset>
@@ -211,7 +211,7 @@
 
     <div id="accountPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
-        <button class="modal-close" type="button" data-action="close-account" aria-label="Close">×</button>
+        <button class="modal-close" type="button" data-action="close-account" aria-label="Close">Ã—</button>
         <h2 id="accountTitle">Your account</h2>
         <p id="accountSummary" class="muted">Signed in.</p>
         <div class="backup-actions">
@@ -225,9 +225,9 @@
 
     <div id="invitePanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle">
-        <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">×</button>
+        <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">Ã—</button>
         <h2 id="inviteTitle">Invite someone to this account</h2>
-        <p class="muted">They’ll see the same properties you do. Other investors keep their own accounts.</p>
+        <p class="muted">Theyâ€™ll see the same properties you do. Other investors keep their own accounts.</p>
         <div id="memberList" class="member-list muted"></div>
         <form id="inviteForm" novalidate>
           <label>Their email <span class="optional">(optional)</span>
@@ -246,7 +246,7 @@
 
     <div id="importPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
-        <button class="modal-close" type="button" data-action="close-import" aria-label="Close">×</button>
+        <button class="modal-close" type="button" data-action="close-import" aria-label="Close">Ã—</button>
         <h2 id="importTitle">Homes on this phone</h2>
         <p id="importMessage" class="muted">We found properties saved on this phone from before accounts. Add them to your account?</p>
         <div class="backup-actions">
@@ -269,7 +269,7 @@
     <div id="exportFormatSheet" class="modal-backdrop" hidden>
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="exportFormatTitle">
         <h2 id="exportFormatTitle">Export expenses</h2>
-        <p class="muted">Includes this home’s expenses (date, amount, category, notes).</p>
+        <p class="muted">Includes this homeâ€™s expenses (date, amount, category, notes).</p>
         <div id="exportFormatError" class="form-error" role="alert" hidden></div>
         <button class="sheet-row sheet-choice" type="button" data-export-format="csv">
           <strong>CSV spreadsheet</strong>
@@ -291,7 +291,7 @@
         <div id="exportReadyError" class="form-error" role="alert" hidden></div>
         <div class="upload-bar" id="exportProgress" hidden><span></span></div>
         <div class="backup-actions">
-          <button class="primary-button" id="exportShareButton" type="button">Share…</button>
+          <button class="primary-button" id="exportShareButton" type="button">Shareâ€¦</button>
           <button class="secondary-button" id="exportSaveButton" type="button">Save file</button>
           <button class="text-button" type="button" data-action="close-export">Done</button>
         </div>
@@ -324,12 +324,12 @@
 
     <div id="backupPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
-        <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
+        <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">Ã—</button>
         <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Backup saves property text data. Photos and receipts stay in your account online. Restoring replaces the properties in your signed-in account, not other people’s.</p>
+        <p class="muted">Backup saves property text data. Photos and receipts stay in your account online. Restoring replaces the properties in your signed-in account, not other peopleâ€™s.</p>
         <div class="backup-actions">
-          <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
-          <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
+          <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">â†“</span> Download backup</button>
+          <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">â†¥</span> Restore from file</button>
         </div>
       </section>
     </div>

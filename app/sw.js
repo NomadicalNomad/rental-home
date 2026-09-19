@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentmanor-shell-v11';
+﻿const CACHE_NAME = 'rentmanor-shell-v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -12,7 +12,10 @@ const APP_SHELL = [
   './export.js',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512-maskable.png'
 ];
 
 self.addEventListener('install', event => {
@@ -28,7 +31,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never cache config.js. On failure do not return a fake JS body — that used to
+  // Never cache config.js. On failure do not return a fake JS body â€” that used to
   // execute as success without setting window.RENTAL_HOME_CONFIG and walled auth.
   // Network-only: let a real miss fail the script load. Inline config in index.html
   // still lets sign-in recover on the next paint.
