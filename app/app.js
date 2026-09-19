@@ -603,6 +603,7 @@ async function loadAppliances(propertyId) {
     return list;
   }
   const supabase = getSupabase();
+  const property = properties.find(item => item.id === propertyId);
   if (!supabase) {
     appliancesByProperty.set(propertyId, []);
     return [];
