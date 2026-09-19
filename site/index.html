@@ -21,8 +21,8 @@
         <a href="index.html" aria-current="page">Home</a>
         <a href="features.html">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
-        <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
+        <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -34,8 +34,8 @@
         <p class="subhead">Your properties. Your people.</p>
         <p class="lead">Private rental portfolios for you and the people you trust.</p>
         <div class="cta-row">
-          <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
-          <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+          <a class="button secondary" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
         </div>
       </div>
     </section>
@@ -57,7 +57,7 @@
       </div>
       <p class="band">Clear on a phone. Clean enough for investor friends.</p>
       <div class="cta-row">
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Get started</a>
+        <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Get started</a>
       </div>
       <p class="a2hs-nudge">Want it on your iPhone? See the steps under <a href="features.html#add-to-home-screen">How it works</a>.</p>
     </section>
@@ -78,12 +78,6 @@
       <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
-  <script>
-    (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
-    })();
-  </script>
+  <script src="app-cta.js"></script>
 </body>
 </html>

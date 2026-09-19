@@ -61,6 +61,7 @@
       <label>Password
         <input name="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Your password">
       </label>
+      <p class="auth-forgot"><button class="text-button" id="showForgot" type="button">Forgot password?</button></p>
       <button class="primary-button" type="submit">Sign in</button>
       <p class="auth-switch">New here? <button class="text-button" id="showSignUp" type="button">Create an account</button></p>
     </form>
@@ -84,6 +85,50 @@
       <button class="primary-button" type="submit">Create account</button>
       <p class="auth-switch">Already have an account? <button class="text-button" id="showSignIn" type="button">Sign in</button></p>
     </form>
+
+    <form id="forgotForm" class="auth-card" novalidate hidden>
+      <div class="js-auth-error form-error" role="alert" hidden></div>
+      <div class="js-auth-success form-success" role="status" hidden></div>
+      <h2>Forgot password?</h2>
+      <p class="muted">Enter the email you use to sign in. We’ll email you a reset link.</p>
+      <label>Email
+        <input name="email" type="email" autocomplete="username" inputmode="email" required maxlength="120" placeholder="you@example.com">
+      </label>
+      <button class="primary-button" type="submit">Send reset link</button>
+      <p class="auth-switch"><button class="text-button" id="showSignInFromForgot" type="button">Back to sign in</button></p>
+    </form>
+
+    <form id="recoveryForm" class="auth-card" novalidate hidden>
+      <div class="js-auth-error form-error" role="alert" hidden></div>
+      <h2>Choose a new password</h2>
+      <p class="muted">Pick a new password for your account.</p>
+      <label>New password
+        <input name="password" type="password" autocomplete="new-password" required minlength="6" placeholder="At least 6 characters">
+      </label>
+      <label>Type the password again
+        <input name="confirm" type="password" autocomplete="new-password" required minlength="6" placeholder="Same password">
+      </label>
+      <button class="primary-button" type="submit">Save new password</button>
+      <p class="auth-switch"><button class="text-button" id="cancelRecovery" type="button">Back to sign in</button></p>
+    </form>
+    <script>
+      (function () {
+        var blob = ((location.hash || '') + (location.search || '')).toLowerCase();
+        if (blob.indexOf('access_token') !== -1 || blob.indexOf('refresh_token') !== -1) return;
+        var signup = blob.indexOf('signup') !== -1 || blob.indexOf('mode=sign-up') !== -1;
+        var forgot = blob.indexOf('#forgot') !== -1 || blob.indexOf('mode=forgot') !== -1;
+        var recovery = blob.indexOf('type=recovery') !== -1;
+        var signIn = document.getElementById('signInForm');
+        var signUp = document.getElementById('signUpForm');
+        var forgotForm = document.getElementById('forgotForm');
+        var recoveryForm = document.getElementById('recoveryForm');
+        if (!signIn || !signUp) return;
+        signIn.hidden = signup || forgot || recovery;
+        signUp.hidden = !signup;
+        if (forgotForm) forgotForm.hidden = !forgot;
+        if (recoveryForm) recoveryForm.hidden = !recovery;
+      })();
+    </script>
   </div>
 
   <div id="signedInApp" class="app-shell" hidden>
@@ -178,12 +223,12 @@
           <fieldset>
             <legend>Notes <span class="optional">(optional)</span></legend>
             <label for="notes" class="sr-only">Property notes</label>
-            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
+            <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
           </fieldset>
+          <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
           <div class="form-actions">
             <button class="primary-button" type="submit">Save property</button>
             <button class="secondary-button" type="button" data-action="cancel-form">Cancel</button>
-            <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
           </div>
         </form>
       </section>
@@ -207,7 +252,7 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle">
         <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">×</button>
         <h2 id="inviteTitle">Invite someone to this account</h2>
-        <p class="muted">They’ll see the same properties you do. Other investors keep their own accounts.</p>
+        <p class="muted">They can view and edit the same properties you can. Other investors keep their own accounts.</p>
         <div id="memberList" class="member-list muted"></div>
         <form id="inviteForm" novalidate>
           <label>Their email <span class="optional">(optional)</span>
@@ -232,6 +277,18 @@
         <div class="backup-actions">
           <button class="primary-button" id="confirmImportButton" type="button">Add them to my account</button>
           <button class="secondary-button" id="skipImportButton" type="button">Not now</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="deletePanel" class="modal-backdrop" hidden>
+      <section class="modal" role="alertdialog" aria-modal="true" aria-labelledby="deleteTitle" aria-describedby="deleteConfirmText">
+        <button class="modal-close" type="button" data-action="close-delete" aria-label="Close">×</button>
+        <h2 id="deleteTitle">Delete this property?</h2>
+        <p class="muted" id="deleteConfirmText">This cannot be undone.</p>
+        <div class="backup-actions">
+          <button class="danger-button" id="confirmDeleteButton" type="button">Delete property</button>
+          <button class="secondary-button" type="button" data-action="close-delete">Keep it</button>
         </div>
       </section>
     </div>

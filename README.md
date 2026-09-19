@@ -21,7 +21,7 @@ Until DNS is live, GitHub Pages still works:
 ## Create an account
 
 1. Open the app in Safari (or a desktop browser): https://app.rentmanor.com/ (or the github.io `/app/` URL above).
-2. Tap **Create an account**.
+2. If you tapped **Create account** / **Get started** on the site, you land on **Create your RentManor account** (`/app/#signup`). **Sign in** links stay on Welcome back (`/app/` or `/app/#signin`).
 3. Enter an email and a password (at least 6 characters).
 4. You land on **Your properties**. Those homes belong only to this account.
 
@@ -34,19 +34,24 @@ Two ways to let a second person see the same portfolio:
 1. **Shared sign-in** — give them the same email and password.
 2. **Invite** — the owner taps **Account → Invite someone**. Optionally type their email, then **Create invite link**. Send the link or the short code. They create their own sign-in (or sign in) and then see the same homes.
 
-Invites work for 14 days. They join as a member of *this* account; they do not get a copy of someone else’s properties.
+Invites work for 14 days. They join as a **member** of *this* account: they can view and edit the same properties you can. They do not get a copy of someone else’s properties. Only the owner can send invites.
+
+## Forgot password
+
+On **Sign in**, tap **Forgot password?** and enter the account email. The app emails a reset link (`resetPasswordForEmail`) that returns to the same app origin you opened — github.io `/app/` or `https://app.rentmanor.com/`. After you choose a new password, you’re signed in.
+
+Those destinations must stay on the Supabase **Redirect URLs** list (see Configure below).
 
 ## Add to Home Screen (iPhone)
 
-1. Open rentmanor.com in Safari (not Chrome).
+Until DNS is live, use the working app URL in Safari (not Chrome):
+
+1. Open https://nomadicalnomad.github.io/rental-home/app/ in Safari (not Chrome).
 2. Tap the Share button.
 3. Tap Add to Home Screen.
 4. Tap Add.
 
-Until DNS is live, the same steps work from the GitHub Pages URLs (Safari, not Chrome):
-
-- Marketing: https://nomadicalnomad.github.io/rental-home/
-- App icon / sign-in: https://nomadicalnomad.github.io/rental-home/app/
+rentmanor.com / app.rentmanor.com will replace that address after DNS.
 
 On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 
@@ -57,6 +62,8 @@ On a computer, bookmark the site. Home Screen install is for iPhone Safari.
 - After sign-in, if this phone still has the old on-device list, the app offers a **one-time import** into the account.
 
 Sample Folsom homes are added only for a brand-new empty account (not on every sign-in).
+
+There are **no demo logins** and nothing auto-signs anyone into a shared QA mailbox. A signed-in screen on `/app/` means this browser already had a Supabase session in `localStorage`. On a shared computer used for screenshots, tap **Account → Sign out** first so the next person is not left in someone else’s portfolio.
 
 ## How to configure (Damon)
 
@@ -86,7 +93,7 @@ Production `app/index.html` also inlines the same public `window.RENTAL_HOME_CON
 
 ## Files
 
-- `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms)
+- `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms). `site/app-cta.js` rewrites Create account → `/app/#signup` and Sign in → `/app/#signin` on github.io.
 - `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `manifest.json`, `sw.js`, `icons/`, `config.js`)
 - `app/config.example.js`, `.env.example` — how to point the PWA at Supabase
 - `supabase/schema.sql` — tables, RLS, invite functions

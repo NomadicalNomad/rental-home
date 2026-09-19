@@ -21,8 +21,8 @@
         <a href="index.html">Home</a>
         <a href="features.html" aria-current="page">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
-        <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a data-app-cta="signin" href="https://app.rentmanor.com/#signin">Sign in</a>
+        <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -61,16 +61,17 @@
         <h2 id="a2hsHeading">Add RentManor to your iPhone</h2>
         <p>Takes about a minute. Use Safari — not Chrome.</p>
         <ol class="a2hs-list">
-          <li>Open <strong>rentmanor.com</strong> in <strong>Safari</strong> (not Chrome).</li>
+          <li>Open <strong>https://nomadicalnomad.github.io/rental-home/app/</strong> in <strong>Safari</strong> (not Chrome).</li>
           <li>Tap the <strong>Share</strong> button.</li>
           <li>Tap <strong>Add to Home Screen</strong>.</li>
           <li>Tap <strong>Add</strong>.</li>
         </ol>
         <p>After that, the RentManor icon sits on your home screen. Open it anytime — you’ll sign in like usual.</p>
+        <p class="tiny">Until the custom domain is live, use the GitHub Pages app address above. rentmanor.com and app.rentmanor.com will replace it after DNS.</p>
         <p>On a computer, bookmark the site. Home Screen install is for iPhone Safari.</p>
         <div class="cta-row">
-          <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
-          <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Already have one? Sign in</a>
+          <a class="button primary" data-app-cta="signup" href="https://app.rentmanor.com/#signup">Create account</a>
+          <a class="button secondary" data-app-cta="signin" href="https://app.rentmanor.com/#signin">Already have one? Sign in</a>
         </div>
       </section>
     </div>
@@ -91,12 +92,6 @@
       <p class="tiny">© 2026 RentManor. Built for small portfolios and the people you trust.</p>
     </div>
   </footer>
-  <script>
-    (function () {
-      if (!/\.github\.io$/i.test(location.hostname)) return;
-      var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
-    })();
-  </script>
+  <script src="app-cta.js"></script>
 </body>
 </html>
