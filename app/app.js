@@ -91,6 +91,64 @@ let uploadBusy = false;
 let pendingExport = null;
 let exportPropertyId = null;
 let confirmResolve = null;
+let usingSampleFallback = false;
+
+const SAMPLE_FALLBACK_HOMES = [
+  {
+    id: '00000000-0000-4000-8000-000000000011',
+    address: '1124 Iron Point Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied',
+    tenantName: 'Maria Hernandez', phone: '(916) 555-0148', email: 'maria.h@example.com', rent: '2450',
+    notes: 'Renewal conversation in October.',
+    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000011.svg',
+    createdAt: '2026-03-01T16:00:00Z', updatedAt: '2026-09-12T17:00:00Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000012',
+    address: '704 Blue Ravine Road', city: 'Folsom', state: 'CA', zip: '95630', status: 'vacant',
+    tenantName: '', phone: '', email: '', rent: '2200',
+    notes: 'Fresh paint completed in the living room.',
+    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000012.svg',
+    createdAt: '2026-04-12T16:00:00Z', updatedAt: '2026-08-03T18:00:00Z'
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000013',
+    address: '1538 East Bidwell Street', city: 'Folsom', state: 'CA', zip: '95630', status: 'occupied',
+    tenantName: 'James Wilson', phone: '(916) 555-0196', email: 'james.wilson@example.com', rent: '2750',
+    notes: 'Two-car garage; gardener included.',
+    thumbnailPath: './sample-media/00000000-0000-4000-8000-000000000013.svg',
+    createdAt: '2026-02-18T16:00:00Z', updatedAt: '2026-09-08T16:30:00Z'
+  }
+];
+
+const SAMPLE_FALLBACK_EXPENSES = [
+  { id: '00000000-0000-4000-8000-000000000021', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-09-12', amount: 84, category: 'Repairs', notes: 'HVAC filter', createdAt: '2026-09-12T17:10:00Z', updatedAt: '2026-09-12T17:10:00Z' },
+  { id: '00000000-0000-4000-8000-000000000022', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-01-15', amount: 420, category: 'Insurance', notes: 'Annual landlord policy', createdAt: '2026-01-15T18:00:00Z', updatedAt: '2026-01-15T18:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000023', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000012', spentOn: '2026-08-03', amount: 186.5, category: 'Supplies', notes: 'Living room paint', createdAt: '2026-08-03T18:20:00Z', updatedAt: '2026-08-03T18:20:00Z' },
+  { id: '00000000-0000-4000-8000-000000000024', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-08', amount: 62.4, category: 'Utilities', notes: 'Water', createdAt: '2026-09-08T16:40:00Z', updatedAt: '2026-09-08T16:40:00Z' },
+  { id: '00000000-0000-4000-8000-000000000025', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-01', amount: 75, category: 'Other', notes: 'Gardener', createdAt: '2026-09-01T15:00:00Z', updatedAt: '2026-09-01T15:00:00Z' }
+];
+
+const SAMPLE_FALLBACK_RECEIPTS = [
+  { id: '00000000-0000-4000-8000-000000000031', accountId: SAMPLE_ACCOUNT_ID, expenseId: '00000000-0000-4000-8000-000000000021', storagePath: './sample-media/00000000-0000-4000-8000-000000000031.svg', contentType: 'image/svg+xml', fileName: 'hvac-filter.svg', createdAt: '2026-09-12T17:12:00Z', updatedAt: '2026-09-12T17:12:00Z' },
+  { id: '00000000-0000-4000-8000-000000000032', accountId: SAMPLE_ACCOUNT_ID, expenseId: '00000000-0000-4000-8000-000000000024', storagePath: './sample-media/00000000-0000-4000-8000-000000000032.pdf', contentType: 'application/pdf', fileName: 'water-bill.pdf', createdAt: '2026-09-08T16:42:00Z', updatedAt: '2026-09-08T16:42:00Z' }
+];
+
+function applySampleFallback() {
+  usingSampleFallback = true;
+  properties = SAMPLE_FALLBACK_HOMES.map(home => ({ ...home }));
+  expensesByProperty = new Map();
+  receiptsByExpense = new Map();
+  SAMPLE_FALLBACK_EXPENSES.forEach(item => {
+    const list = expensesByProperty.get(item.propertyId) || [];
+    list.push({ ...item });
+    expensesByProperty.set(item.propertyId, list);
+  });
+  SAMPLE_FALLBACK_RECEIPTS.forEach(item => {
+    const list = receiptsByExpense.get(item.expenseId) || [];
+    list.push({ ...item });
+    receiptsByExpense.set(item.expenseId, list);
+  });
+}
 
 function makeId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
@@ -252,11 +310,23 @@ async function loadProperties() {
     .select('*')
     .eq('account_id', accountId)
     .order('updated_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (sampleMode) {
+      applySampleFallback();
+      return;
+    }
+    throw error;
+  }
+  usingSampleFallback = false;
   properties = (data || []).map(fromRow);
 }
 
 async function loadExpenses(propertyId) {
+  if (sampleMode && usingSampleFallback) {
+    const list = SAMPLE_FALLBACK_EXPENSES.filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
+    expensesByProperty.set(propertyId, list);
+    return list;
+  }
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('expenses')
@@ -264,20 +334,39 @@ async function loadExpenses(propertyId) {
     .eq('property_id', propertyId)
     .order('spent_on', { ascending: false })
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (sampleMode) {
+      const list = SAMPLE_FALLBACK_EXPENSES.filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
+      expensesByProperty.set(propertyId, list);
+      return list;
+    }
+    throw error;
+  }
   const list = (data || []).map(fromExpenseRow);
   expensesByProperty.set(propertyId, list);
   return list;
 }
 
 async function loadReceipts(expenseId) {
+  if (sampleMode && usingSampleFallback) {
+    const list = SAMPLE_FALLBACK_RECEIPTS.filter(item => item.expenseId === expenseId).map(item => ({ ...item }));
+    receiptsByExpense.set(expenseId, list);
+    return list;
+  }
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('receipts')
     .select('*')
     .eq('expense_id', expenseId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (sampleMode) {
+      const list = SAMPLE_FALLBACK_RECEIPTS.filter(item => item.expenseId === expenseId).map(item => ({ ...item }));
+      receiptsByExpense.set(expenseId, list);
+      return list;
+    }
+    throw error;
+  }
   const list = (data || []).map(fromReceiptRow);
   receiptsByExpense.set(expenseId, list);
   return list;
@@ -1561,9 +1650,9 @@ startAuth(async ({ status, notice }) => {
       await loadProperties();
       await applySamplePath();
     } catch (error) {
+      applySampleFallback();
+      await applySamplePath();
       showToast(friendlyError(error));
-      propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Sample isn’t ready</h3><p>${escapeHTML(friendlyError(error))}</p></div>`;
-      showView('list');
     }
     return;
   }

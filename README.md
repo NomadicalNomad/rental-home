@@ -66,7 +66,7 @@ Anyone can open the shared demo without signing in:
 - App: https://app.rentmanor.com/#/sample
 - GitHub Pages: https://nomadicalnomad.github.io/rental-home/app/#/sample
 
-It uses the fixed sample account `00000000-0000-4000-8000-000000000001` (`accounts.is_sample = true`). Clients can only **read** that account. There is no “load sample into my account” button.
+It uses the fixed sample account `00000000-0000-4000-8000-000000000001` (`accounts.is_sample = true`). Clients can only **read** that account. There is no “load sample into my account” button. If the sample tables are not applied yet, the app still shows the same three demo homes from local files so the journey stays view-only.
 
 ## Photos, expenses, receipts
 
