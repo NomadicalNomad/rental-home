@@ -376,7 +376,7 @@ async function loadProperties() {
           .order('updated_at', { ascending: false });
         if (!error && data?.length) {
           usingSampleFallback = false;
-          properties = rowsForAccount(data, SAMPLE_ACCOUNT_ID).map(fromRow);
+          properties = rowsForAccount(data, SAMPLE_ACCOUNT_ID).map(row => mergeSampleFacts(fromRow(row)));
           return;
         }
       } catch (_) { /* local Folsom fallback */ }
@@ -503,6 +503,33 @@ function fromTenantFileRow(row) {
   };
 }
 
+function fallbackPropertyIdFor(property) {
+  if (!property) return '';
+  const match = samplePortfolio().find(row => row.address === property.address);
+  return match?.id || property.id;
+}
+
+function mergeSampleFacts(property) {
+  const template = samplePortfolio().find(row => row.address === property.address);
+  if (!template) return property;
+  const take = (current, fallback) => (current === '' || current == null ? fallback : current);
+  return {
+    ...property,
+    beds: take(property.beds, template.beds),
+    baths: take(property.baths, template.baths),
+    sqft: take(property.sqft, template.sqft),
+    yearBuilt: take(property.yearBuilt, template.year_built),
+    propertyType: take(property.propertyType, template.property_type),
+    description: take(property.description, template.description),
+    utilityElectric: take(property.utilityElectric, template.utility_electric),
+    utilityGas: take(property.utilityGas, template.utility_gas),
+    utilityWater: take(property.utilityWater, template.utility_water),
+    utilityNotes: take(property.utilityNotes, template.utility_notes),
+    trashSchedule: take(property.trashSchedule, template.trash_schedule),
+    trashNotes: take(property.trashNotes, template.trash_notes)
+  };
+}
+
 function thumbnailAsPhotos(property) {
   if (!property?.thumbnailPath) return [];
   return [{
@@ -552,10 +579,13 @@ async function loadPhotos(propertyId) {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) {
-    if (sampleMode && usingSampleFallback) {
-      const list = samplePhotos().filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
-      photosByProperty.set(propertyId, list);
-      return list;
+    if (sampleMode) {
+      const list = samplePhotos().filter(item => item.propertyId === fallbackPropertyIdFor(property)).map(item => ({
+        ...item,
+        propertyId
+      }));
+      photosByProperty.set(propertyId, list.length ? list : thumbnailAsPhotos(property));
+      return photosByProperty.get(propertyId);
     }
     const list = thumbnailAsPhotos(property);
     photosByProperty.set(propertyId, list);
@@ -583,8 +613,11 @@ async function loadAppliances(propertyId) {
     .eq('property_id', propertyId)
     .order('created_at', { ascending: true });
   if (error) {
-    if (sampleMode && usingSampleFallback) {
-      const list = sampleAppliances().filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
+    if (sampleMode) {
+      const list = sampleAppliances().filter(item => item.propertyId === fallbackPropertyIdFor(property)).map(item => ({
+        ...item,
+        propertyId
+      }));
       appliancesByProperty.set(propertyId, list);
       return list;
     }
@@ -615,9 +648,9 @@ async function loadTenant(propertyId) {
     .eq('property_id', propertyId)
     .maybeSingle();
   if (error) {
-    if (sampleMode && usingSampleFallback) {
-      const tenant = sampleTenants().find(item => item.propertyId === propertyId) || null;
-      tenantByProperty.set(propertyId, tenant ? { ...tenant } : null);
+    if (sampleMode) {
+      const tenant = sampleTenants().find(item => item.propertyId === fallbackPropertyIdFor(property)) || null;
+      tenantByProperty.set(propertyId, tenant ? { ...tenant, propertyId } : null);
       return tenantByProperty.get(propertyId);
     }
     const tenant = contactAsTenant(property);
@@ -647,7 +680,7 @@ async function loadTenantFiles(tenantId) {
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
   if (error) {
-    if (sampleMode && usingSampleFallback) {
+    if (sampleMode) {
       const list = sampleTenantFiles().filter(item => item.tenantId === tenantId).map(item => ({ ...item }));
       tenantFilesByTenant.set(tenantId, list);
       return list;
