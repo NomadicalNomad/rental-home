@@ -15,7 +15,9 @@ import {
   SAMPLE_ACCOUNT_ID,
   enterSampleRoute,
   exitSampleRoute,
-  requestAuthMode
+  requestAuthMode,
+  parseSampleRoute,
+  setSampleHash
 } from './auth.js';
 import {
   thumbnailObjectPath,
@@ -373,7 +375,7 @@ function updateSampleChrome() {
   if (signIn) signIn.hidden = !sampleMode || signedIn;
   if (signUp) signUp.hidden = !sampleMode || signedIn;
   const heading = document.querySelector('#listHeading');
-  if (heading) heading.textContent = sampleMode ? 'Your properties · Sample' : 'Your properties';
+  if (heading) heading.textContent = sampleMode ? 'Sample portfolio' : 'Your properties';
 }
 
 function thumbMarkup(property, size = 'card') {
@@ -429,7 +431,7 @@ function renderList() {
         <h3>No properties yet.</h3>
         <p>Add your first rental.</p>
         <button class="primary-button js-write" type="button" data-action="add">+ Add home</button>
-        ${sampleMode ? '' : `<button class="text-button muted-link" type="button" data-action="view-sample">View sample</button>
+        ${sampleMode ? '' : `<button class="text-button muted-link" type="button" data-action="view-sample">View a sample portfolio</button>
         <p class="empty-help">See how RentManor looks with example homes. You can’t edit the sample.</p>`}
       </div>`;
     return;
@@ -454,12 +456,38 @@ function contactButton(label, value, scheme, icon) {
 }
 
 function expenseSummary(list) {
-  const year = new Date().getFullYear();
-  const thisYear = list.filter(item => String(item.spentOn || '').startsWith(String(year)));
-  const use = thisYear.length ? thisYear : list;
-  const total = use.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const label = thisYear.length ? 'this year' : 'all time';
-  return `${money(total)} ${label} · ${use.length} ${use.length === 1 ? 'expense' : 'expenses'}`;
+  const total = list.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  return `${money(total)} total · ${list.length} ${list.length === 1 ? 'expense' : 'expenses'}`;
+}
+
+function goSample(subpath = '') {
+  if (!setSampleHash(subpath)) applySamplePath();
+}
+
+async function applySamplePath() {
+  const route = parseSampleRoute();
+  if (!route.sample) {
+    showView('list');
+    return;
+  }
+  if (!route.propertyId) {
+    showView('list');
+    return;
+  }
+  const property = properties.find(item => item.id === route.propertyId);
+  if (!property) {
+    showView('list');
+    return;
+  }
+  if (route.expenseId) {
+    const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id).catch(() => []);
+    const expense = expenses.find(item => item.id === route.expenseId);
+    if (expense) {
+      await openExpense(property, expense);
+      return;
+    }
+  }
+  await renderDetail(property);
 }
 
 function expenseRow(expense) {
@@ -505,7 +533,7 @@ async function renderDetail(property) {
         ${property.status === 'occupied' && property.tenantName ? `<p class="muted">Tenant: <strong>${escapeHTML(property.tenantName)}</strong></p>` : ''}
       </div>
       <div class="detail-grid">
-        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
+        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' && write ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
         ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
         ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
       </div>
@@ -514,6 +542,7 @@ async function renderDetail(property) {
           <div>
             <h3>Expenses</h3>
             <p class="muted">${expenses.length ? escapeHTML(expenseSummary(expenses)) : 'No expenses yet.'}</p>
+            ${canWrite() ? '<p class="muted">People on this account can see these expenses and receipts.</p>' : ''}
           </div>
           <div class="heading-actions">
             ${expenses.length ? `<button class="secondary-button compact" type="button" data-action="export-expenses" data-id="${escapeHTML(property.id)}">Export</button>` : ''}
@@ -898,8 +927,8 @@ function receiptBlock(expense) {
           <strong>${escapeHTML(name)}</strong>
           <div class="receipt-actions">
             ${receipt && !pendingReceiptFile ? `<button class="text-button" type="button" data-action="view-receipt" data-expense-id="${escapeHTML(expense.id)}">View</button>` : ''}
-            ${canWrite() ? `<button class="text-button" type="button" data-action="replace-receipt">Replace</button>
-            <button class="text-button danger" type="button" data-action="remove-receipt">Remove</button>` : ''}
+            ${canWrite() ? `<button class="text-button js-write" type="button" data-action="replace-receipt">Replace</button>
+            <button class="text-button danger js-write" type="button" data-action="remove-receipt">Remove</button>` : ''}
           </div>
         </div>
         <span class="upload-bar" hidden><span></span></span>
@@ -911,12 +940,13 @@ function receiptBlock(expense) {
 
 function renderExpenseForm(property, expense) {
   const selected = expense?.category && CATEGORIES.includes(expense.category) ? expense.category : (expense?.category ? 'Other' : 'Repairs');
+  const write = canWrite();
   expenseView.innerHTML = `
     <button class="back-link" type="button" data-action="back-to-detail" data-id="${escapeHTML(property.id)}"><span aria-hidden="true">‹</span> Back to ${escapeHTML(property.address)}</button>
     <div class="section-heading form-title">
       <div>
-        <p class="eyebrow">${expense ? 'Update expense' : 'New expense'}</p>
-        <h2 id="expenseHeading">${expense ? 'Edit expense' : 'New expense'}</h2>
+        <p class="eyebrow">${write ? (expense ? 'Update expense' : 'New expense') : 'Expense'}</p>
+        <h2 id="expenseHeading">${write ? (expense ? 'Edit expense' : 'New expense') : 'Expense'}</h2>
       </div>
     </div>
     <form id="expenseForm" novalidate>
@@ -940,20 +970,21 @@ function renderExpenseForm(property, expense) {
         <div id="receiptError" class="form-error" role="alert" hidden></div>
       </fieldset>
       <div class="form-actions sticky">
-        <button class="primary-button" type="submit"${canWrite() ? '' : ' hidden'}>Save</button>
-        <button class="secondary-button" type="button" data-action="back-to-detail" data-id="${escapeHTML(property.id)}">Cancel</button>
+        <button class="primary-button js-write" type="submit"${write ? '' : ' hidden'}>Save</button>
+        <button class="secondary-button" type="button" data-action="back-to-detail" data-id="${escapeHTML(property.id)}">${write ? 'Cancel' : 'Done'}</button>
       </div>
     </form>
-    ${expense && canWrite() ? `<div class="danger-zone js-write"><button class="danger-link" type="button" data-action="delete-expense" data-expense-id="${escapeHTML(expense.id)}" data-property-id="${escapeHTML(property.id)}">Delete expense</button></div>` : ''}`;
+    ${expense && write ? `<div class="danger-zone js-write"><button class="danger-link" type="button" data-action="delete-expense" data-expense-id="${escapeHTML(expense.id)}" data-property-id="${escapeHTML(property.id)}">Delete expense</button></div>` : ''}`;
   showView('expense');
   const expenseForm = document.querySelector('#expenseForm');
   if (expenseForm) expenseForm.addEventListener('submit', submitExpense);
-  if (!canWrite()) {
+  if (!write) {
     expenseView.querySelectorAll('input, textarea, select').forEach(field => { field.disabled = true; });
   }
 }
 
 async function openExpense(property, expense = null) {
+  if (!expense && !canWrite()) return;
   expensePropertyId = property.id;
   editingExpenseId = expense?.id || null;
   pendingReceiptFile = null;
@@ -1419,13 +1450,19 @@ function bindUi() {
     const actionTarget = event.target.closest('[data-action]');
     if (actionTarget) {
       const action = actionTarget.dataset.action;
-      if (action === 'add') openForm();
-      if (action === 'edit') openForm(properties.find(property => property.id === actionTarget.dataset.id));
-      if (action === 'back-to-list' || action === 'cancel-form') showView('list');
-      if (action === 'back-to-detail') {
-        const property = properties.find(item => item.id === actionTarget.dataset.id);
-        if (property) renderDetail(property);
+      if (action === 'add') { if (canWrite()) openForm(); }
+      if (action === 'edit') { if (canWrite()) openForm(properties.find(property => property.id === actionTarget.dataset.id)); }
+      if (action === 'back-to-list' || action === 'cancel-form') {
+        if (sampleMode) goSample();
         else showView('list');
+      }
+      if (action === 'back-to-detail') {
+        if (sampleMode) goSample(actionTarget.dataset.id || '');
+        else {
+          const property = properties.find(item => item.id === actionTarget.dataset.id);
+          if (property) renderDetail(property);
+          else showView('list');
+        }
       }
       if (action === 'clear-filters') { searchInput.value = ''; activeFilter = 'all'; document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all')); renderList(); }
       if (action === 'view-sample') enterSampleRoute();
@@ -1440,15 +1477,20 @@ function bindUi() {
         if (property) openExportSheet(property);
       }
       if (action === 'add-expense') {
+        if (!canWrite()) return;
         const property = properties.find(item => item.id === actionTarget.dataset.id);
         if (property) openExpense(property);
       }
       if (action === 'open-expense') {
         const property = properties.find(item => item.id === actionTarget.dataset.propertyId);
         const expense = (expensesByProperty.get(actionTarget.dataset.propertyId) || []).find(item => item.id === actionTarget.dataset.expenseId);
-        if (property && expense) openExpense(property, expense);
+        if (property && expense && sampleMode) goSample(`${property.id}/expense/${expense.id}`);
+        else if (property && expense) openExpense(property, expense);
       }
-      if (action === 'add-receipt' || action === 'replace-receipt') receiptSheet.hidden = false;
+      if (action === 'add-receipt' || action === 'replace-receipt') {
+        if (!canWrite()) return;
+        receiptSheet.hidden = false;
+      }
       if (action === 'remove-receipt') removeCurrentReceipt();
       if (action === 'view-receipt') viewReceipt(actionTarget.dataset.expenseId);
       if (action === 'delete-expense') deleteExpense(actionTarget.dataset.propertyId, actionTarget.dataset.expenseId);
@@ -1466,7 +1508,11 @@ function bindUi() {
       return;
     }
     const card = event.target.closest('.property-card');
-    if (card) renderDetail(properties.find(property => property.id === card.dataset.id));
+    if (card) {
+      const property = properties.find(item => item.id === card.dataset.id);
+      if (property && sampleMode) goSample(property.id);
+      else if (property) renderDetail(property);
+    }
     if (event.target === backupPanel) backupPanel.hidden = true;
     if (event.target === accountPanel) accountPanel.hidden = true;
     if (event.target === invitePanel) invitePanel.hidden = true;
@@ -1513,7 +1559,7 @@ startAuth(async ({ status, notice }) => {
       expensesByProperty = new Map();
       receiptsByExpense = new Map();
       await loadProperties();
-      showView('list');
+      await applySamplePath();
     } catch (error) {
       showToast(friendlyError(error));
       propertyList.innerHTML = `<div class="empty-state"><div class="empty-icon" aria-hidden="true">⌂</div><h3>Sample isn’t ready</h3><p>${escapeHTML(friendlyError(error))}</p></div>`;

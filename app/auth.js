@@ -5,7 +5,6 @@ const PLACEHOLDER_URL = 'YOUR_PROJECT.supabase.co';
 const PLACEHOLDER_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 export const SAMPLE_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
-const SAMPLE_HASH = /^#?\/?sample\/?$/i;
 
 let supabase = null;
 let currentUser = null;
@@ -144,13 +143,34 @@ export function showScreen(name) {
 
 let pendingAuthMode = null;
 
+function sampleHashParts() {
+  return (location.hash || '').replace(/^#/, '').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+}
+
 export function isSampleRoute() {
-  const hash = (location.hash || '').replace(/^#/, '').replace(/^\/+|\/+$/g, '');
-  return SAMPLE_HASH.test(hash);
+  return sampleHashParts()[0] === 'sample';
+}
+
+export function parseSampleRoute() {
+  const parts = sampleHashParts();
+  if (parts[0] !== 'sample') return { sample: false, propertyId: '', expenseId: '' };
+  return {
+    sample: true,
+    propertyId: parts[1] || '',
+    expenseId: parts[2] === 'expense' ? (parts[3] || '') : ''
+  };
+}
+
+export function setSampleHash(subpath = '') {
+  const next = subpath ? `/sample/${String(subpath).replace(/^\/+|\/+$/g, '')}` : '/sample';
+  const current = `#${(location.hash || '').replace(/^#/, '')}`;
+  if (current === `#${next}`) return false;
+  location.hash = next;
+  return true;
 }
 
 export function enterSampleRoute() {
-  if (!isSampleRoute()) location.hash = '/sample';
+  setSampleHash('');
 }
 
 export function exitSampleRoute() {

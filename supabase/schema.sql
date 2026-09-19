@@ -874,15 +874,6 @@ insert into public.properties (
     'Two-car garage; gardener included.',
     '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000013/thumbnail.svg',
     '2026-02-18T16:00:00Z', '2026-09-08T16:30:00Z'
-  ),
-  (
-    '00000000-0000-4000-8000-000000000014',
-    '00000000-0000-4000-8000-000000000001',
-    '889 Sibley Street', 'Folsom', 'CA', '95630', 'vacant',
-    '', '', '', '1950',
-    '',
-    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000014/thumbnail.svg',
-    '2026-05-20T16:00:00Z', '2026-07-01T16:00:00Z'
   )
 on conflict (id) do update
   set address = excluded.address,
@@ -935,13 +926,6 @@ insert into public.expenses (
     '00000000-0000-4000-8000-000000000013',
     '2026-09-01', 75.00, 'Other', 'Gardener',
     '2026-09-01T15:00:00Z', '2026-09-01T15:00:00Z'
-  ),
-  (
-    '00000000-0000-4000-8000-000000000026',
-    '00000000-0000-4000-8000-000000000001',
-    '00000000-0000-4000-8000-000000000014',
-    '2026-06-22', 48.00, 'Repairs', 'Front porch light',
-    '2026-06-22T19:00:00Z', '2026-06-22T19:00:00Z'
   )
 on conflict (id) do update
   set spent_on = excluded.spent_on,
@@ -978,3 +962,8 @@ on conflict (id) do update
       content_type = excluded.content_type,
       file_name = excluded.file_name,
       updated_at = excluded.updated_at;
+
+-- Keep the shared demo to 3 homes (drop an earlier fourth Folsom clone if present).
+delete from public.properties
+where id = '00000000-0000-4000-8000-000000000014'
+  and account_id = '00000000-0000-4000-8000-000000000001';

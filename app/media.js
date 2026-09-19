@@ -47,7 +47,7 @@ export async function compressImageFile(file) {
   if (!file) throw new Error('Please choose a photo.');
   if (isPdf(file)) throw new Error('Please choose a photo.');
   if (!String(file.type || '').startsWith('image/')) throw new Error('Please choose a photo.');
-  if (file.size > MAX_SOURCE_BYTES) throw new Error('Couldn’t add that photo. Try a smaller one.');
+  if (file.size > MAX_SOURCE_BYTES) throw new Error('Photo too large — try again.');
 
   let bitmap = null;
   try {
@@ -79,7 +79,7 @@ export async function compressImageFile(file) {
     quality -= 0.08;
     blob = await canvasToBlob(canvas, 'image/jpeg', quality);
   }
-  if (blob.size > MAX_IMAGE_BYTES) throw new Error('Couldn’t add that photo. Try a smaller one.');
+  if (blob.size > MAX_IMAGE_BYTES) throw new Error('Photo too large — try again.');
   return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
 }
 
@@ -97,7 +97,11 @@ export async function uploadAccountMedia(path, file, { upsert = true } = {}) {
     contentType: file.type || 'application/octet-stream',
     cacheControl: '3600'
   });
-  if (error) throw error;
+  if (error) {
+    const message = String(error.message || '');
+    if (/fetch|network/i.test(message)) throw new Error('Couldn’t save photo — check connection.');
+    throw error;
+  }
   signedCache.delete(path);
   return path;
 }
@@ -116,7 +120,7 @@ function sampleFallbackUrl(path) {
   if (!path || !String(path).startsWith(`${SAMPLE_ACCOUNT_ID}/`)) return '';
   const file = path.split('/').pop() || '';
   const stem = file.replace(/\.(svg|pdf|jpe?g|png|webp)$/i, '');
-  if (/00000000-0000-4000-8000-00000000001[1-4]$/.test(stem)) return `./sample-media/${stem}.svg`;
+  if (/00000000-0000-4000-8000-00000000001[1-3]$/.test(stem)) return `./sample-media/${stem}.svg`;
   if (stem === '00000000-0000-4000-8000-000000000031') return './sample-media/00000000-0000-4000-8000-000000000031.svg';
   if (stem === '00000000-0000-4000-8000-000000000032') return './sample-media/00000000-0000-4000-8000-000000000032.pdf';
   return '';

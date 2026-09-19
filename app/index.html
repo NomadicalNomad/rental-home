@@ -63,7 +63,7 @@
       </label>
       <button class="primary-button" type="submit">Sign in</button>
       <p class="auth-switch">New here? <button class="text-button" id="showSignUp" type="button">Create an account</button></p>
-      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample portfolio</button></p>
+      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample</button></p>
     </form>
 
     <form id="signUpForm" class="auth-card" novalidate hidden>
@@ -84,20 +84,20 @@
       </label>
       <button class="primary-button" type="submit">Create account</button>
       <p class="auth-switch">Already have an account? <button class="text-button" id="showSignIn" type="button">Sign in</button></p>
-      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample portfolio</button></p>
+      <p class="auth-sample"><button class="text-button" type="button" data-action="view-sample">View sample</button></p>
     </form>
   </div>
 
   <div id="signedInApp" class="app-shell" hidden>
     <div id="sampleBanner" class="sample-banner" hidden>
       <div>
-        <strong>SAMPLE · Read only</strong>
-        <p>Example homes. You can’t change anything.</p>
+        <strong>Sample portfolio · view only</strong>
+        <p>This is a shared demo — not your account.</p>
       </div>
       <div class="sample-banner-actions">
-        <button class="secondary-button compact" id="exitSampleAccount" type="button">My account</button>
-        <button class="secondary-button compact" id="exitSampleSignIn" type="button">Sign in</button>
+        <button class="secondary-button compact" id="exitSampleAccount" type="button">Back to my account</button>
         <button class="primary-button compact" id="exitSampleSignUp" type="button">Create account</button>
+        <button class="secondary-button compact" id="exitSampleSignIn" type="button">Sign in</button>
       </div>
     </div>
     <header class="app-header">
@@ -215,9 +215,9 @@
         <h2 id="accountTitle">Your account</h2>
         <p id="accountSummary" class="muted">Signed in.</p>
         <div class="backup-actions">
-          <button class="primary-button" id="inviteButton" type="button">Invite someone</button>
-          <button class="secondary-button" id="backupButton" type="button">Backup &amp; restore</button>
-          <button class="secondary-button" id="legacyImportButton" type="button" hidden>Bring in homes from this phone</button>
+          <button class="primary-button js-write" id="inviteButton" type="button">Invite someone</button>
+          <button class="secondary-button js-write" id="backupButton" type="button">Backup &amp; restore</button>
+          <button class="secondary-button js-write" id="legacyImportButton" type="button" hidden>Bring in homes from this phone</button>
           <button class="danger-link" id="signOutButton" type="button">Sign out</button>
         </div>
       </section>
@@ -326,10 +326,10 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
         <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
         <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Download a copy of the homes in <strong>this</strong> account. Restoring replaces the properties in your signed-in account, not other people’s.</p>
+        <p class="muted">Backup saves property text data. Photos and receipts stay in your account online. Restoring replaces the properties in your signed-in account, not other people’s.</p>
         <div class="backup-actions">
           <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
-          <button class="secondary-button" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
+          <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
         </div>
       </section>
     </div>

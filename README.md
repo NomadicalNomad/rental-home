@@ -27,7 +27,7 @@ Until DNS is live, GitHub Pages still works:
 
 It is okay if Mom and a helper both use the **same email and password**. That is the simplest way to share.
 
-To see how the app looks with example homes, tap **View sample portfolio** (or open `/#/sample`). The sample is shared and read-only. It is not copied into your account.
+To see how the app looks with example homes, tap **View a sample portfolio** (or open `/#/sample`). The sample is a shared demo — view only. It is not copied into your account. Use **Back to my account** to return.
 
 ## Invite / share
 
@@ -73,7 +73,7 @@ It uses the fixed sample account `00000000-0000-4000-8000-000000000001` (`accoun
 On a property you own:
 
 - Add, replace, or remove one primary photo (camera or library). It shows on the list and the detail screen.
-- Track expenses (date, amount, category, notes) with a simple year total.
+- Track expenses (date, amount, category, notes) with an all-time total.
 - Export that property’s expenses as CSV or PDF, then **Share…** or **Save file**. Receipt files are not included.
 - Attach one receipt per expense — camera, photo library, or PDF — then view or remove it.
 
