@@ -118,13 +118,13 @@
           </div>
           <button class="primary-button compact js-write" id="addButton" type="button">+ Add home</button>
         </div>
-        <label class="search-box" id="searchBox" for="searchInput">
+        <label class="search-box" id="searchBox" for="searchInput" hidden>
           <span aria-hidden="true">⌕</span>
           <span class="sr-only">Search properties</span>
           <input id="searchInput" type="search" placeholder="Search by address or tenant" autocomplete="off">
           <button id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
         </label>
-        <div class="filter-row" id="filterRow" aria-label="Filter properties">
+        <div class="filter-row" id="filterRow" aria-label="Filter properties" hidden>
           <button class="filter-button active" type="button" data-filter="all">All</button>
           <button class="filter-button" type="button" data-filter="occupied">Occupied</button>
           <button class="filter-button" type="button" data-filter="vacant">Vacant</button>

@@ -195,7 +195,15 @@ body.sample-mode .app-header { padding-top: 14px; }
 @media (prefers-reduced-motion: reduce) { .upload-bar span { animation: none; width: 100%; } }
 .danger-link { min-height: 44px; border: 0; color: var(--danger); background: transparent; font-weight: 750; }
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; align-items: end; padding: 18px; background: rgba(10, 35, 33, .4); }
-.modal { position: relative; width: 100%; max-width: 394px; margin: 0 auto; padding: 25px 20px calc(36px + env(safe-area-inset-bottom)); border-radius: 20px 20px 10px 10px; background: white; box-shadow: 0 -8px 35px rgba(0,0,0,.15); }
+.modal { position: relative; width: 100%; max-width: 394px; margin: 0 auto; padding: 25px 20px calc(28px + env(safe-area-inset-bottom)); border-radius: 20px 20px 10px 10px; background: white; box-shadow: 0 -8px 35px rgba(0,0,0,.15); }
+#accountPanel { padding-bottom: 72px; }
+#accountPanel .modal { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+#signOutButton { position: relative; z-index: 2; }
+iframe[title*="Netlify" i],
+.netlify-badge,
+#netlify-badge,
+[data-netlify-deploy-id],
+a.netlify-button { display: none !important; }
 .modal h2 { margin-bottom: 9px; }
 .modal p { margin-bottom: 20px; }
 .modal-close { position: absolute; top: 13px; right: 13px; width: 40px; height: 40px; border: 0; box-shadow: none; background: #f1f6f5; font-size: 1.4rem; }
