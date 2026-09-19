@@ -167,7 +167,7 @@
       <section id="detailView" class="view" aria-labelledby="detailHeading" hidden></section>
 
       <section id="formView" class="view" aria-labelledby="formHeading" hidden>
-        <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
+        <button class="back-link form-back" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
         <div class="section-heading form-title">
           <div>
             <p class="eyebrow" id="formEyebrow">New property</p>
@@ -175,6 +175,7 @@
           </div>
         </div>
         <form id="propertyForm" novalidate>
+          <div class="form-scroll">
           <div id="formError" class="form-error" role="alert" hidden></div>
           <fieldset>
             <legend>Property details</legend>
@@ -224,10 +225,13 @@
             <label for="notes" class="sr-only">Property notes</label>
             <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
           </fieldset>
-          <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
+          <div class="form-delete-slot">
+            <button class="danger-link" id="deleteButton" type="button" hidden>Delete property</button>
+          </div>
+          </div>
           <div class="form-actions">
+            <button class="text-button" type="button" data-action="cancel-form">Cancel</button>
             <button class="primary-button" type="submit">Save property</button>
-            <button class="secondary-button" type="button" data-action="cancel-form">Cancel</button>
           </div>
         </form>
       </section>
@@ -283,11 +287,11 @@
     <div id="deletePanel" class="modal-backdrop" hidden>
       <section class="modal" role="alertdialog" aria-modal="true" aria-labelledby="deleteTitle" aria-describedby="deleteConfirmText">
         <button class="modal-close" type="button" data-action="close-delete" aria-label="Close">×</button>
-        <h2 id="deleteTitle">Delete this property?</h2>
+        <h2 id="deleteTitle">Delete this home?</h2>
         <p class="muted" id="deleteConfirmText">This cannot be undone.</p>
         <div class="backup-actions">
-          <button class="danger-button" id="confirmDeleteButton" type="button">Delete property</button>
-          <button class="secondary-button" type="button" data-action="close-delete">Keep it</button>
+          <button class="danger-button" id="confirmDeleteButton" type="button">Delete</button>
+          <button class="secondary-button" type="button" data-action="close-delete">Cancel</button>
         </div>
       </section>
     </div>

@@ -323,7 +323,7 @@ async function deleteProperty() {
   const property = properties.find(item => item.id === editingId);
   if (!property) return;
   const text = document.querySelector('#deleteConfirmText');
-  if (text) text.textContent = `Delete ${property.address}? This cannot be undone.`;
+  if (text) text.textContent = `${property.address} will be removed. This cannot be undone.`;
   deletePanel.hidden = false;
 }
 
