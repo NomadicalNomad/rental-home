@@ -41,9 +41,9 @@
     <div id="inviteBanner" class="invite-banner" hidden>
       <p id="inviteBannerText">You have an invite to share a rental account.</p>
     </div>
-    <div id="authError" class="form-error" role="alert" hidden></div>
 
     <form id="signInForm" class="auth-card" novalidate>
+      <div class="js-auth-error form-error" role="alert" hidden></div>
       <h2>Sign in</h2>
       <p class="muted">Use the email and password for your account. It’s okay if more than one person uses the same sign-in.</p>
       <label>Email
@@ -57,6 +57,7 @@
     </form>
 
     <form id="signUpForm" class="auth-card" novalidate hidden>
+      <div class="js-auth-error form-error" role="alert" hidden></div>
       <h2>Create an account</h2>
       <p class="muted">This keeps your homes private. You can invite someone later so they see the same list.</p>
       <label>Email

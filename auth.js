@@ -112,15 +112,15 @@ function showEl(id, visible) {
 }
 
 function setAuthError(message) {
-  const box = document.querySelector('#authError');
-  if (!box) return;
-  if (!message) {
-    box.hidden = true;
-    box.textContent = '';
-    return;
-  }
-  box.hidden = false;
-  box.textContent = message;
+  document.querySelectorAll('.js-auth-error').forEach(box => {
+    if (!message) {
+      box.hidden = true;
+      box.textContent = '';
+      return;
+    }
+    box.hidden = false;
+    box.textContent = message;
+  });
 }
 
 function setBusy(button, busy, label) {
