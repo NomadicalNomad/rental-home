@@ -19,6 +19,7 @@ import {
 } from '../app/media.js';
 import {
   DETAIL_TABS,
+  GALLERY_SOFT_CAP,
   detailHeaderHtml,
   detailTabsHtml,
   galleryHtml,
@@ -74,7 +75,7 @@ test('vacant tenant tab is an empty state with no fake contact', () => {
   });
   assert.match(occupied, /Maria Hernandez/);
   assert.match(occupied, /Lease agreement/);
-  assert.match(occupied, /Letters &amp; emails/);
+  assert.match(occupied, /Letters &amp; emails \(copies you save\)/);
   assert.match(occupied, /Call/);
   assert.match(occupied, /Text/);
   assert.match(occupied, /Email/);
@@ -104,8 +105,7 @@ test('property tab groups Basics, Utilities, Trash, Appliances, and Photos', () 
     expenseSummary: '2 expenses · $504'
   });
   assert.match(html, /Basics/);
-  assert.match(html, /Utilities/);
-  assert.match(html, /Trash/);
+  assert.match(html, /Utilities &amp; trash/);
   assert.match(html, /Appliances/);
   assert.match(html, /Photos/);
   assert.match(html, /Primary photo shows on your list/);
@@ -142,11 +142,11 @@ test('property write form is collapsible groups with no people fields', () => {
     sample: false
   });
   assert.match(html, /<details class="info-card is-disclosure"/);
-  assert.match(html, /<summary>Basics<\/summary>/);
-  assert.match(html, /<summary>Utilities<\/summary>/);
-  assert.match(html, /<summary>Trash<\/summary>/);
-  assert.match(html, /<summary>Appliances<\/summary>/);
+  assert.match(html, /<h3>Basics<\/h3>/);
+  assert.match(html, /<summary>Utilities &amp; trash · Not set<\/summary>/);
+  assert.match(html, /<summary>Appliances · None<\/summary>/);
   assert.match(html, /id="detailSaveBar"/);
+  assert.match(html, /Primary photo shows on your list/);
   assert.doesNotMatch(html, /name="tenantName"|name="phone"|name="email"/);
   assert.doesNotMatch(html, />Call<|>Text</);
   assert.doesNotMatch(html, /Maria|Alex|555-/);
@@ -158,6 +158,10 @@ test('sticky address chrome and 3-segment tabs use selected fill, not underline-
   assert.match(html, /Folsom, CA 95630/);
   assert.match(html, /Occupied/);
   assert.match(html, /\$2,450\/mo/);
+  const writable = detailHeaderHtml({ address: '1124 Iron Point Road', status: 'vacant' }, { location: 'Folsom, CA 95630', write: true });
+  assert.match(writable, /data-action="set-status-occupied"/);
+  assert.match(writable, /data-action="set-status-vacant"/);
+  assert.equal(GALLERY_SOFT_CAP, 10);
   const tabs = detailTabsHtml('property');
   assert.match(tabs, /role="tablist"/);
   assert.match(tabs, /aria-selected="true"[^>]*data-tab="property"|data-tab="property"[^>]*aria-selected="true"/);
@@ -209,6 +213,8 @@ test('SQL and PWA keep account isolation and one tenant per property', () => {
   assert.match(appJs, /Save changes\?/);
   assert.match(appJs, /confirmLeaveDirtyTab/);
   assert.match(appJs, /Remove tenant info and files for this home\?/);
+  assert.match(appJs, /Remove tenant record\?/);
+  assert.match(appJs, /You can add up to 10 photos/);
   assert.doesNotMatch(appJs, /function seedProperties/);
   assert.doesNotMatch(appJs, /Please add the tenant name for an occupied home/);
 });

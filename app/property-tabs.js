@@ -20,6 +20,8 @@ export const FUEL_OPTIONS = [
   ['other', 'Other']
 ];
 
+export const GALLERY_SOFT_CAP = 10;
+
 export function escapeHTML(value) {
   if (value === '' || value == null) return '';
   return String(value).replace(/[&<>'"]/g, character => ({
@@ -66,12 +68,18 @@ export function detailTabsHtml(active) {
   </div>`;
 }
 
-export function detailHeaderHtml(property, { location, rent } = {}) {
+export function detailHeaderHtml(property, { location, rent, write = false } = {}) {
+  const status = write
+    ? `<span class="status-chrome js-write" role="group" aria-label="Rental status">
+        <button type="button" class="badge occupied${property.status === 'occupied' ? ' is-current' : ''}" data-action="set-status-occupied">Occupied</button>
+        <button type="button" class="badge vacant${property.status === 'vacant' ? ' is-current' : ''}" data-action="set-status-vacant">Vacant</button>
+      </span>`
+    : `<span class="badge ${property.status}">${property.status === 'occupied' ? 'Occupied' : 'Vacant'}</span>`;
   return `<div class="detail-header">
       <h2 id="detailHeading">${escapeHTML(property.address)}</h2>
       <p class="detail-meta">
         <span>${escapeHTML(location || '')}</span>
-        <span class="badge ${property.status}">${property.status === 'occupied' ? 'Occupied' : 'Vacant'}</span>
+        ${status}
         ${rent ? `<span>${escapeHTML(rent)}/mo</span>` : ''}
       </p>
     </div>`;
@@ -98,14 +106,6 @@ function fuelChipsHtml(selected = '') {
   </div>`;
 }
 
-function statusChoiceHtml(property) {
-  const occupied = property.status === 'occupied';
-  return `<div class="status-choice" role="radiogroup" aria-label="Rental status">
-      <label class="choice-card" data-action="set-status-occupied"><input type="radio" name="statusChoice" value="occupied" ${occupied ? 'checked' : ''}><span><strong>Occupied</strong><small>Someone lives here</small></span></label>
-      <label class="choice-card" data-action="set-status-vacant"><input type="radio" name="statusChoice" value="vacant" ${occupied ? '' : 'checked'}><span><strong>Vacant</strong><small>Ready for a tenant</small></span></label>
-    </div>`;
-}
-
 export function galleryHtml({ photos, write, sample }) {
   const tiles = (photos || []).map(photo => `
     <button class="gallery-tile${photo.isPrimary ? ' is-primary' : ''}" type="button" data-action="gallery-photo" data-photo-id="${escapeHTML(photo.id)}" aria-label="${photo.isPrimary ? 'Primary photo' : 'Property photo'}">
@@ -114,7 +114,8 @@ export function galleryHtml({ photos, write, sample }) {
       </div>
       ${photo.isPrimary ? '<span class="gallery-star" aria-hidden="true">★</span><span class="gallery-chip">Primary</span>' : ''}
     </button>`).join('');
-  const add = write
+  const atCap = (photos || []).length >= GALLERY_SOFT_CAP;
+  const add = write && !atCap
     ? `<button class="gallery-tile is-add js-write" type="button" data-action="add-gallery-photo"><span aria-hidden="true">＋</span> Add</button>`
     : '';
   if (!photos?.length && !write) {
@@ -123,7 +124,7 @@ export function galleryHtml({ photos, write, sample }) {
   return `<div class="info-card">
     <div class="card-head">
       <h3>Photos</h3>
-      ${write ? '<button class="text-button js-write" type="button" data-action="add-gallery-photo">+ Add</button>' : ''}
+      ${write && !atCap ? '<button class="text-button js-write" type="button" data-action="add-gallery-photo">+ Add</button>' : ''}
     </div>
     <p class="muted">Primary photo shows on your list.</p>
     <div class="gallery-row">${tiles}${add}</div>
@@ -153,7 +154,7 @@ export function appliancesHtml({ appliances, write }) {
     </form>` : '';
   const empty = !appliances?.length;
   const body = `${rows || '<p class="muted">No appliances listed.</p>'}${add}`;
-  if (write) return disclosureCard('Appliances', body, !empty);
+  if (write) return disclosureCard(empty ? 'Appliances · None' : 'Appliances', body, !empty);
   return `<div class="info-card">
     <h3>Appliances</h3>
     ${body}
@@ -198,11 +199,8 @@ export function propertyFactsHtml(property) {
       ${readBasics(property)}
     </div>
     <div class="info-card">
-      <h3>Utilities</h3>
+      <h3>Utilities &amp; trash</h3>
       ${readUtilities(property)}
-    </div>
-    <div class="info-card">
-      <h3>Trash</h3>
       ${readTrash(property)}
     </div>`;
 }
@@ -214,8 +212,9 @@ function disclosureCard(title, body, open) {
     </details>`;
 }
 
-function editAddressCard(property) {
-  return disclosureCard('Address', `
+function editBasicsCard(property) {
+  return `<div class="info-card">
+      <h3>Basics</h3>
       <label>Street address <span class="required" aria-hidden="true">*</span>
         <input name="address" type="text" autocomplete="street-address" required maxlength="120" value="${escapeHTML(property.address)}" placeholder="123 Main Street">
       </label>
@@ -234,11 +233,7 @@ function editAddressCard(property) {
         <label>Monthly rent
           <input name="rent" type="number" inputmode="decimal" min="0" step="1" value="${escapeHTML(property.rent)}" placeholder="2450">
         </label>
-      </div>`, true);
-}
-
-function editBasicsCard(property) {
-  return disclosureCard('Basics', `
+      </div>
       <p class="info-label">Property type</p>
       ${typeChipsHtml(property.propertyType)}
       <div class="two-columns">
@@ -262,12 +257,14 @@ function editBasicsCard(property) {
       </label>
       <label>Notes <span class="optional">(optional)</span>
         <textarea name="notes" rows="2" maxlength="1000" placeholder="Gate code, lockbox…">${escapeHTML(property.notes)}</textarea>
-      </label>`, true);
+      </label>
+    </div>`;
 }
 
-function editUtilitiesCard(property) {
-  const empty = !property.utilityElectric && !property.utilityGas && !property.utilityWater && !property.utilityNotes;
-  return disclosureCard('Utilities', `
+function editUtilitiesTrashCard(property) {
+  const empty = !property.utilityElectric && !property.utilityGas && !property.utilityWater && !property.utilityNotes
+    && !property.trashSchedule && !property.trashNotes;
+  return disclosureCard(empty ? 'Utilities &amp; trash · Not set' : 'Utilities &amp; trash', `
       <label>Electric
         <input name="utilityElectric" type="text" maxlength="80" value="${escapeHTML(property.utilityElectric)}" placeholder="PG&amp;E · acct on file">
       </label>
@@ -279,48 +276,34 @@ function editUtilitiesCard(property) {
       </label>
       <label>Notes <span class="optional">(optional)</span>
         <textarea name="utilityNotes" rows="2" maxlength="400" placeholder="Who pays which bill">${escapeHTML(property.utilityNotes)}</textarea>
-      </label>`, !empty);
-}
-
-function editTrashCard(property) {
-  const empty = !property.trashSchedule && !property.trashNotes;
-  return disclosureCard('Trash', `
-      <label>Schedule
+      </label>
+      <label>Trash schedule
         <input name="trashSchedule" type="text" maxlength="80" value="${escapeHTML(property.trashSchedule)}" placeholder="Tue / Fri">
       </label>
-      <label>Notes <span class="optional">(optional)</span>
+      <label>Trash notes <span class="optional">(optional)</span>
         <textarea name="trashNotes" rows="2" maxlength="400" placeholder="Bins out by 6am">${escapeHTML(property.trashNotes)}</textarea>
       </label>`, !empty);
 }
 
 export function propertyTabHtml({ property, photos, appliances, expenses, tenant, write, sample, expenseSummary = '' }) {
-  const statusCard = write
-    ? `<div class="info-card js-write">
-        <h3>Status</h3>
-        ${statusChoiceHtml(property)}
-      </div>`
-    : '';
   const fields = write
     ? `<form id="propertyDetailForm" novalidate>
         <div id="propertyDetailError" class="form-error" role="alert" hidden></div>
-        ${editAddressCard(property)}
         ${editBasicsCard(property)}
-        ${editUtilitiesCard(property)}
-        ${editTrashCard(property)}
+        ${editUtilitiesTrashCard(property)}
         <div id="detailSaveBar" class="form-actions sticky js-write" hidden>
           <button class="primary-button" type="submit">Save</button>
         </div>
       </form>`
     : propertyFactsHtml(property);
   const tenantChip = hasCurrentTenant(tenant)
-    ? `<button class="deep-link" type="button" data-action="goto-tenant">Tenant: ${escapeHTML(tenant.name || 'Tenant')} · Occupied</button>`
+    ? `<button class="text-button muted-link" type="button" data-action="goto-tenant">Tenant: ${escapeHTML(tenant.name || 'Tenant')}</button>`
     : '';
   const expenseChip = expenses?.length
-    ? `<button class="deep-link" type="button" data-action="goto-expenses">${escapeHTML(expenseSummary || `${expenses.length} expenses`)}</button>`
+    ? `<button class="text-button muted-link" type="button" data-action="goto-expenses">${escapeHTML(expenseSummary || `${expenses.length} expenses`)}</button>`
     : '';
   return `
     <div class="detail-grid">
-      ${statusCard}
       ${fields}
       ${appliancesHtml({ appliances, write })}
       ${galleryHtml({ photos, write, sample })}
@@ -436,10 +419,7 @@ export function tenantTabHtml({ property, tenant, files, write, editing }) {
     </div>
     <div class="info-card">
       <div class="card-head">
-        <div>
-          <h3>Letters &amp; emails</h3>
-          <p class="muted">Copies you save</p>
-        </div>
+        <h3>Letters &amp; emails (copies you save)</h3>
         ${write ? '<button class="text-button js-write" type="button" data-action="add-correspondence">+ Add</button>' : ''}
       </div>
       ${correspondence || '<p class="muted">No letters or emails saved.</p>'}

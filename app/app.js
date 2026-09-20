@@ -36,6 +36,7 @@ import { toPropertyRow, withoutOptionalPropertyColumns, withoutThumbnailPath } f
 import {
   detailHeaderHtml,
   detailTabsHtml,
+  GALLERY_SOFT_CAP,
   hasCurrentTenant,
   propertyTabHtml,
   tenantTabHtml
@@ -1103,7 +1104,7 @@ async function renderDetail(property) {
         <span class="upload-bar" hidden><span></span></span>
       </button>
       <div class="detail-sticky">
-        ${detailHeaderHtml(property, { location: propertyLocation(property), rent: currency(property.rent) })}
+        ${detailHeaderHtml(property, { location: propertyLocation(property), rent: currency(property.rent), write })}
         ${detailTabsHtml(tab)}
       </div>
       <div class="detail-panel" role="tabpanel" id="panel-${tab}" aria-labelledby="tab-${tab}">${panel}</div>`;
@@ -1252,7 +1253,16 @@ async function savePropertyPhoto(property) {
   return saved;
 }
 
+function galleryPhotoCount(propertyId) {
+  return (photosByProperty.get(propertyId) || []).length;
+}
+
 async function addGalleryPhoto(property, file) {
+  const existingCount = galleryPhotoCount(property.id);
+  if (existingCount >= GALLERY_SOFT_CAP) {
+    showToast('You can add up to 10 photos.');
+    return property;
+  }
   const ready = await compressImageFile(file);
   const photoId = makeId();
   const ext = extensionForType(ready.type, 'jpg');
@@ -1549,16 +1559,23 @@ async function applyPickedPhotos(fileList) {
   }
   const property = properties.find(item => item.id === editingId);
   if (!property || !canWrite()) return;
+  const room = GALLERY_SOFT_CAP - galleryPhotoCount(property.id);
+  if (room <= 0) {
+    showToast('You can add up to 10 photos.');
+    return;
+  }
+  const accepted = files.slice(0, room);
+  if (accepted.length < files.length) showToast('You can add up to 10 photos.');
   closeSheets();
   const bar = detailView.querySelector('.upload-bar');
   if (bar) bar.hidden = false;
   uploadBusy = true;
   try {
-    for (const file of files) {
+    for (const file of accepted) {
       await addGalleryPhoto(property, file);
     }
     await loadProperties();
-    showToast(files.length > 1 ? 'Photos saved.' : 'Photo saved.');
+    showToast(accepted.length > 1 ? 'Photos saved.' : 'Photo saved.');
     renderDetail(properties.find(item => item.id === property.id) || property);
   } catch (error) {
     showToast(friendlyError(error));
@@ -2024,9 +2041,12 @@ async function saveTenantFromForm() {
   }
 }
 
-async function markPropertyVacant(propertyId) {
+async function markPropertyVacant(propertyId, { fromStatus = false } = {}) {
   if (!canWrite()) return false;
-  if (!await askConfirm({ title: 'Remove tenant', message: 'Remove tenant info and files for this home?', confirmLabel: 'Remove tenant' })) return false;
+  const asked = fromStatus
+    ? await askConfirm({ title: 'Remove tenant record?', message: 'Remove tenant record? Lease copies and letters for this home will be deleted.', confirmLabel: 'Remove tenant' })
+    : await askConfirm({ title: 'Remove tenant', message: 'Remove tenant info and files for this home?', confirmLabel: 'Remove tenant' });
+  if (!asked) return false;
   try {
     const supabase = getSupabase();
     const tenant = tenantByProperty.get(propertyId) || await loadTenant(propertyId);
@@ -2545,7 +2565,7 @@ function bindUi() {
           renderDetail(property);
           return;
         }
-        const removed = await markPropertyVacant(property.id);
+        const removed = await markPropertyVacant(property.id, { fromStatus: true });
         if (!removed) renderDetail(properties.find(item => item.id === property.id) || property);
       }
       if (action === 'delete-property') deleteProperty(actionTarget.dataset.id || detailPropertyId);
