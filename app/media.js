@@ -13,6 +13,18 @@ export function thumbnailObjectPath(accountId, propertyId, ext = 'jpg') {
   return `${accountId}/properties/${propertyId}/thumbnail.${ext}`;
 }
 
+export function galleryPhotoPath(accountId, propertyId, photoId, ext = 'jpg') {
+  return `${accountId}/properties/${propertyId}/photos/${photoId}.${ext}`;
+}
+
+export function leaseObjectPath(accountId, propertyId, ext = 'pdf') {
+  return `${accountId}/properties/${propertyId}/tenant/lease.${ext}`;
+}
+
+export function tenantFileObjectPath(accountId, propertyId, fileId, ext) {
+  return `${accountId}/properties/${propertyId}/tenant/files/${fileId}.${ext}`;
+}
+
 export function receiptObjectPath(accountId, propertyId, expenseId, receiptId, ext) {
   return `${accountId}/properties/${propertyId}/expenses/${expenseId}/${receiptId}.${ext}`;
 }
@@ -113,8 +125,8 @@ export async function uploadAccountMedia(path, file, { upsert = true } = {}) {
     if (/fetch|network/i.test(message)) throw new Error('Couldn’t save photo — check connection.');
     if (/mime|content.?type|not allowed|invalid/i.test(message)) {
       throw new Error(isPdf(file)
-        ? 'Couldn't save that PDF. Try another file.'
-        : 'Couldn't save that photo. Try another file.');
+        ? 'Couldn’t save that PDF. Try another file.'
+        : 'Couldn’t save that photo. Try another file.');
     }
     throw error;
   }
@@ -133,12 +145,19 @@ export async function removeAccountMedia(paths) {
 }
 
 function sampleFallbackUrl(path) {
-  if (!path || !String(path).startsWith(`${SAMPLE_ACCOUNT_ID}/`)) return '';
+  if (!path) return '';
+  if (/^(?:\.\/|data:|blob:|https?:)/i.test(path)) return path;
+  if (!String(path).startsWith(`${SAMPLE_ACCOUNT_ID}/`)) return '';
   const file = path.split('/').pop() || '';
   const stem = file.replace(/\.(svg|pdf|jpe?g|png|webp)$/i, '');
   if (/00000000-0000-4000-8000-00000000001[1-3]$/.test(stem)) return `./sample-media/${stem}.svg`;
-  if (stem === '00000000-0000-4000-8000-000000000031') return './sample-media/00000000-0000-4000-8000-000000000031.svg';
-  if (stem === '00000000-0000-4000-8000-000000000032') return './sample-media/00000000-0000-4000-8000-000000000032.pdf';
+  if (stem === '00000000-0000-4000-8000-000000000031' || stem === '00000000-0000-4000-8000-000000000081') {
+    return './sample-media/00000000-0000-4000-8000-000000000031.svg';
+  }
+  if (stem === '00000000-0000-4000-8000-000000000042') return './sample-media/00000000-0000-4000-8000-000000000012.svg';
+  if (stem === '00000000-0000-4000-8000-000000000032' || stem === 'lease') {
+    return './sample-media/00000000-0000-4000-8000-000000000032.pdf';
+  }
   return '';
 }
 

@@ -34,6 +34,29 @@ test('toPropertyRow includes thumbnail_path only when a photo path exists', () =
   assert.equal(withoutThumbnailPath(row).thumbnail_path, undefined);
 });
 
+test('toPropertyRow includes MLS and utility fields only when set', () => {
+  const empty = toPropertyRow(home, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  assert.equal('beds' in empty, false);
+  assert.equal('property_type' in empty, false);
+  const row = toPropertyRow({
+    ...home,
+    beds: '3',
+    baths: '2.5',
+    sqft: '1620',
+    yearBuilt: '1998',
+    propertyType: 'Single family',
+    utilityElectric: 'SMUD',
+    trashSchedule: 'Thursday'
+  }, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  assert.equal(row.beds, 3);
+  assert.equal(row.baths, 2.5);
+  assert.equal(row.sqft, 1620);
+  assert.equal(row.year_built, 1998);
+  assert.equal(row.property_type, 'Single family');
+  assert.equal(row.utility_electric, 'SMUD');
+  assert.equal(row.trash_schedule, 'Thursday');
+});
+
 test('desktop Web Share fallback is a clear toast when canShare is missing', () => {
   assert.equal(canShareFiles({ name: 'file.csv' }, undefined), false);
   assert.equal(canShareFiles({ name: 'file.csv' }, {}), false);

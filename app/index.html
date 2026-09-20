@@ -170,28 +170,68 @@
           <fieldset>
             <legend>Rental status</legend>
             <div class="status-choice" role="radiogroup" aria-label="Rental status">
-              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>A tenant lives here</small></span></label>
+              <label class="choice-card"><input type="radio" name="status" value="occupied" required><span><strong>Occupied</strong><small>Add the tenant next</small></span></label>
               <label class="choice-card"><input type="radio" name="status" value="vacant"><span><strong>Vacant</strong><small>Ready for a tenant</small></span></label>
             </div>
-          </fieldset>
-          <fieldset id="tenantFields">
-            <legend>Tenant details <span class="optional">(optional for vacant homes)</span></legend>
-            <label>Tenant name
-              <input name="tenantName" type="text" autocomplete="name" maxlength="100" placeholder="Alex Johnson">
-            </label>
-            <div class="two-columns">
-              <label>Phone
-                <input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(916) 555-0123">
-              </label>
-              <label>Email
-                <input name="email" type="email" autocomplete="email" maxlength="120" placeholder="alex@example.com">
-              </label>
-            </div>
+            <p class="muted">Tenant name, phone, and email live on the Tenant tab.</p>
           </fieldset>
           <fieldset>
             <legend>Notes <span class="optional">(optional)</span></legend>
             <label for="notes" class="sr-only">Property notes</label>
-            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Appliance notes, renewal date, reminders…"></textarea>
+            <textarea id="notes" name="notes" rows="4" maxlength="1000" placeholder="Gate code, lockbox, showing notes…"></textarea>
+          </fieldset>
+          <fieldset id="homeFactsFields">
+            <legend>Home facts <span class="optional">(optional)</span></legend>
+            <div class="two-columns">
+              <label>Beds
+                <input name="beds" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder="3">
+              </label>
+              <label>Baths
+                <input name="baths" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder="2">
+              </label>
+            </div>
+            <div class="two-columns">
+              <label>Square feet
+                <input name="sqft" type="number" inputmode="numeric" min="0" step="1" placeholder="1600">
+              </label>
+              <label>Year built
+                <input name="yearBuilt" type="number" inputmode="numeric" min="1800" max="2100" step="1" placeholder="1998">
+              </label>
+            </div>
+            <label>Type
+              <select name="propertyType">
+                <option value="">Choose one</option>
+                <option>Single family</option>
+                <option>Townhouse</option>
+                <option>Condo</option>
+                <option>Multi-family</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <label>Description
+              <textarea name="description" rows="3" maxlength="1000" placeholder="One-story, two-car garage…"></textarea>
+            </label>
+          </fieldset>
+          <fieldset id="utilityFields">
+            <legend>Utilities &amp; trash <span class="optional">(optional)</span></legend>
+            <label>Electric company
+              <input name="utilityElectric" type="text" maxlength="80" placeholder="SMUD">
+            </label>
+            <label>Gas company
+              <input name="utilityGas" type="text" maxlength="80" placeholder="PG&amp;E">
+            </label>
+            <label>Water
+              <input name="utilityWater" type="text" maxlength="80" placeholder="City of Folsom">
+            </label>
+            <label>Utility notes
+              <textarea name="utilityNotes" rows="2" maxlength="400" placeholder="Who pays which bill"></textarea>
+            </label>
+            <label>Trash pickup
+              <input name="trashSchedule" type="text" maxlength="80" placeholder="Thursday mornings">
+            </label>
+            <label>Trash notes
+              <textarea name="trashNotes" rows="2" maxlength="400" placeholder="Bins out by 6am"></textarea>
+            </label>
           </fieldset>
           <fieldset class="js-write">
             <legend>Photo <span class="optional">(optional)</span></legend>
@@ -259,6 +299,8 @@
     <div id="photoSheet" class="modal-backdrop" hidden>
       <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="photoSheetTitle">
         <h2 id="photoSheetTitle">Property photo</h2>
+        <button class="sheet-row" id="viewPhotoButton" type="button" data-photo="view" hidden>View photo</button>
+        <button class="sheet-row js-write" id="makePrimaryButton" type="button" data-photo="primary" hidden>Make primary</button>
         <button class="sheet-row js-write" type="button" data-photo="camera">Take photo</button>
         <button class="sheet-row js-write" type="button" data-photo="library">Choose from library</button>
         <button class="sheet-row danger js-write" id="removePhotoButton" type="button" data-photo="remove" hidden>Remove photo</button>
@@ -313,6 +355,7 @@
         <h2 id="confirmTitle">Please confirm</h2>
         <p id="confirmMessage" class="muted"></p>
         <button class="sheet-row danger" id="confirmYes" type="button">Confirm</button>
+        <button class="sheet-row" id="confirmDiscard" type="button" hidden>Discard</button>
         <button class="sheet-row" type="button" data-action="close-confirm">Cancel</button>
       </section>
     </div>
@@ -320,13 +363,17 @@
     <div id="lightbox" class="lightbox" hidden>
       <button class="lightbox-close" type="button" data-action="close-lightbox">Close</button>
       <img id="lightboxImage" alt="">
+      <div id="lightboxActions" class="lightbox-actions js-write" hidden>
+        <button class="secondary-button compact" type="button" data-action="lightbox-primary">Make primary</button>
+        <button class="danger-link" type="button" data-action="lightbox-remove">Remove</button>
+      </div>
     </div>
 
     <div id="backupPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
         <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
         <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Backup saves property text data. Photos and receipts stay in your account online. Restoring replaces the properties in your signed-in account, not other people’s.</p>
+        <p class="muted">Backup saves property text data. Photos, receipts, lease, and correspondence stay in your account online. Restoring replaces the properties in this signed-in account, not other people’s.</p>
         <div class="backup-actions">
           <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
           <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>
@@ -338,7 +385,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <input id="restoreInput" type="file" accept="application/json,.json" hidden>
   <input id="photoCameraInput" type="file" accept="image/*" capture="environment" hidden>
-  <input id="photoLibraryInput" type="file" accept="image/*" hidden>
+  <input id="photoLibraryInput" type="file" accept="image/*" multiple hidden>
   <input id="receiptCameraInput" type="file" accept="image/*" capture="environment" hidden>
   <input id="receiptLibraryInput" type="file" accept="image/*" hidden>
   <input id="receiptPdfInput" type="file" accept="application/pdf,.pdf" hidden>

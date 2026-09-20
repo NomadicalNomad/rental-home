@@ -3,7 +3,11 @@ import {
   SAMPLE_ACCOUNT_ID,
   canMutateAccount,
   rowsForAccount,
+  sampleAppliances,
+  samplePhotos,
   samplePortfolio,
+  sampleTenantFiles,
+  sampleTenants,
   sampleWriteError,
   scopedAccountId,
   shouldInjectDemoProperties
@@ -27,10 +31,21 @@ import {
   parseSampleRoute,
   setSampleHash
 } from './auth.js';
-import { isMissingColumnError } from './errors.js';
-import { toPropertyRow, withoutThumbnailPath } from './property-row.js';
+import { isMissingColumnError, isSchemaSetupError } from './errors.js';
+import { toPropertyRow, withoutOptionalPropertyColumns, withoutThumbnailPath } from './property-row.js';
+import {
+  detailHeaderHtml,
+  detailTabsHtml,
+  GALLERY_SOFT_CAP,
+  hasCurrentTenant,
+  propertyTabHtml,
+  tenantTabHtml
+} from './property-tabs.js';
 import {
   thumbnailObjectPath,
+  galleryPhotoPath,
+  leaseObjectPath,
+  tenantFileObjectPath,
   receiptObjectPath,
   extensionForType,
   isPdf,
@@ -83,11 +98,21 @@ const accountButton = document.querySelector('#accountButton');
 let properties = [];
 let expensesByProperty = new Map();
 let receiptsByExpense = new Map();
+let photosByProperty = new Map();
+let appliancesByProperty = new Map();
+let tenantByProperty = new Map();
+let tenantFilesByTenant = new Map();
 let activeFilter = 'all';
 let currentView = 'list';
 let editingId = null;
 let editingExpenseId = null;
 let expensePropertyId = null;
+let detailTab = 'property';
+let detailPropertyId = null;
+let tenantEditorOpen = false;
+let detailDirty = false;
+let galleryPhotoId = null;
+let filePickerContext = 'receipt';
 let toastTimer;
 let importMode = 'offer';
 let ready = false;
@@ -121,6 +146,10 @@ function applySampleFallback() {
   properties = samplePortfolio().map(fromRow);
   expensesByProperty = new Map();
   receiptsByExpense = new Map();
+  photosByProperty = new Map();
+  appliancesByProperty = new Map();
+  tenantByProperty = new Map();
+  tenantFilesByTenant = new Map();
   SAMPLE_FALLBACK_EXPENSES.forEach(item => {
     const list = expensesByProperty.get(item.propertyId) || [];
     list.push({ ...item });
@@ -130,6 +159,24 @@ function applySampleFallback() {
     const list = receiptsByExpense.get(item.expenseId) || [];
     list.push({ ...item });
     receiptsByExpense.set(item.expenseId, list);
+  });
+  samplePhotos().forEach(item => {
+    const list = photosByProperty.get(item.propertyId) || [];
+    list.push({ ...item });
+    photosByProperty.set(item.propertyId, list);
+  });
+  sampleAppliances().forEach(item => {
+    const list = appliancesByProperty.get(item.propertyId) || [];
+    list.push({ ...item });
+    appliancesByProperty.set(item.propertyId, list);
+  });
+  sampleTenants().forEach(item => {
+    tenantByProperty.set(item.propertyId, { ...item });
+  });
+  sampleTenantFiles().forEach(item => {
+    const list = tenantFilesByTenant.get(item.tenantId) || [];
+    list.push({ ...item });
+    tenantFilesByTenant.set(item.tenantId, list);
   });
 }
 
@@ -174,6 +221,18 @@ function cleanProperty(value, index = 0) {
     rent: text('rent', 20),
     notes: text('notes', 1000),
     thumbnailPath: text('thumbnailPath', 400) || text('thumbnail_path', 400),
+    beds: text('beds', 8),
+    baths: text('baths', 8),
+    sqft: text('sqft', 10),
+    yearBuilt: text('yearBuilt', 6) || text('year_built', 6),
+    propertyType: text('propertyType', 40) || text('property_type', 40),
+    description: text('description', 1000),
+    utilityElectric: text('utilityElectric', 80) || text('utility_electric', 80),
+    utilityGas: text('utilityGas', 80) || text('utility_gas', 80),
+    utilityWater: text('utilityWater', 80) || text('utility_water', 80),
+    utilityNotes: text('utilityNotes', 400) || text('utility_notes', 400),
+    trashSchedule: text('trashSchedule', 80) || text('trash_schedule', 80),
+    trashNotes: text('trashNotes', 400) || text('trash_notes', 400),
     createdAt: text('createdAt', 40) || text('created_at', 40) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -193,6 +252,18 @@ function fromRow(row) {
     rent: row.rent || '',
     notes: row.notes || '',
     thumbnailPath: row.thumbnail_path || '',
+    beds: row.beds ?? '',
+    baths: row.baths ?? '',
+    sqft: row.sqft ?? '',
+    yearBuilt: row.year_built ?? row.yearBuilt ?? '',
+    propertyType: row.property_type || row.propertyType || '',
+    description: row.description || '',
+    utilityElectric: row.utility_electric || row.utilityElectric || '',
+    utilityGas: row.utility_gas || row.utilityGas || '',
+    utilityWater: row.utility_water || row.utilityWater || '',
+    utilityNotes: row.utility_notes || row.utilityNotes || '',
+    trashSchedule: row.trash_schedule || row.trashSchedule || '',
+    trashNotes: row.trash_notes || row.trashNotes || '',
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString()
   };
@@ -208,6 +279,8 @@ function toRow(property) {
   return toPropertyRow(property, getAccount().id);
 }
 
+const OPTIONAL_LOOKS = /beds|baths|sqft|year_built|property_type|description|utility_|trash_|thumbnail_path/i;
+
 async function writePropertyRows(rows, { existingId = null } = {}) {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Could not connect. Check your internet and try again.');
@@ -216,9 +289,11 @@ async function writePropertyRows(rows, { existingId = null } = {}) {
     ? await table.update(rows[0]).eq('id', existingId)
     : await table.insert(rows);
   if (!first.error) return;
-  const missingThumb = rows.some(row => row.thumbnail_path) && isMissingColumnError(first.error, 'thumbnail_path');
-  if (!missingThumb) throw first.error;
-  const fallback = rows.map(withoutThumbnailPath);
+  const missingOptional = OPTIONAL_LOOKS.test(String(first.error?.message || ''))
+    || isMissingColumnError(first.error)
+    || rows.some(row => row.thumbnail_path) && isMissingColumnError(first.error, 'thumbnail_path');
+  if (!missingOptional) throw first.error;
+  const fallback = rows.map(row => withoutOptionalPropertyColumns(withoutThumbnailPath(row)));
   const retry = existingId
     ? await supabase.from('properties').update(fallback[0]).eq('id', existingId)
     : await supabase.from('properties').insert(fallback);
@@ -292,6 +367,21 @@ function readBackupFile(text) {
 
 async function loadProperties() {
   if (sampleMode) {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('account_id', SAMPLE_ACCOUNT_ID)
+          .order('updated_at', { ascending: false });
+        if (!error && data?.length) {
+          usingSampleFallback = false;
+          properties = rowsForAccount(data, SAMPLE_ACCOUNT_ID).map(row => mergeSampleFacts(fromRow(row)));
+          return;
+        }
+      } catch (_) { /* local Folsom fallback */ }
+    }
     applySampleFallback();
     return;
   }
@@ -364,6 +454,257 @@ async function loadReceipts(expenseId) {
   return list;
 }
 
+function fromPhotoRow(row) {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    propertyId: row.property_id,
+    storagePath: row.storage_path,
+    sortOrder: Number(row.sort_order) || 0,
+    isPrimary: Boolean(row.is_primary)
+  };
+}
+
+function fromApplianceRow(row) {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    propertyId: row.property_id,
+    name: row.name || '',
+    fuel: row.fuel || '',
+    notes: row.notes || ''
+  };
+}
+
+function fromTenantRow(row) {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    propertyId: row.property_id,
+    name: row.name || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    notes: row.notes || '',
+    leaseStoragePath: row.lease_storage_path || '',
+    leaseContentType: row.lease_content_type || '',
+    leaseFileName: row.lease_file_name || ''
+  };
+}
+
+function fromTenantFileRow(row) {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    tenantId: row.tenant_id,
+    propertyId: row.property_id,
+    kind: row.kind || 'correspondence',
+    storagePath: row.storage_path,
+    contentType: row.content_type || '',
+    fileName: row.file_name || ''
+  };
+}
+
+function fallbackPropertyIdFor(property) {
+  if (!property) return '';
+  const match = samplePortfolio().find(row => row.address === property.address);
+  return match?.id || property.id;
+}
+
+function mergeSampleFacts(property) {
+  const template = samplePortfolio().find(row => row.address === property.address);
+  if (!template) return property;
+  const take = (current, fallback) => (current === '' || current == null ? fallback : current);
+  return {
+    ...property,
+    beds: take(property.beds, template.beds),
+    baths: take(property.baths, template.baths),
+    sqft: take(property.sqft, template.sqft),
+    yearBuilt: take(property.yearBuilt, template.year_built),
+    propertyType: take(property.propertyType, template.property_type),
+    description: take(property.description, template.description),
+    utilityElectric: take(property.utilityElectric, template.utility_electric),
+    utilityGas: take(property.utilityGas, template.utility_gas),
+    utilityWater: take(property.utilityWater, template.utility_water),
+    utilityNotes: take(property.utilityNotes, template.utility_notes),
+    trashSchedule: take(property.trashSchedule, template.trash_schedule),
+    trashNotes: take(property.trashNotes, template.trash_notes)
+  };
+}
+
+function thumbnailAsPhotos(property) {
+  if (!property?.thumbnailPath) return [];
+  return [{
+    id: `thumb-${property.id}`,
+    accountId: activeAccountId(),
+    propertyId: property.id,
+    storagePath: property.thumbnailPath,
+    sortOrder: 0,
+    isPrimary: true
+  }];
+}
+
+function contactAsTenant(property) {
+  if (!property) return null;
+  if (!(property.tenantName || property.phone || property.email || property.status === 'occupied')) return null;
+  return {
+    id: `legacy-${property.id}`,
+    accountId: activeAccountId(),
+    propertyId: property.id,
+    name: property.tenantName || '',
+    phone: property.phone || '',
+    email: property.email || '',
+    notes: '',
+    leaseStoragePath: '',
+    leaseContentType: '',
+    leaseFileName: ''
+  };
+}
+
+async function loadPhotos(propertyId) {
+  if (sampleMode && usingSampleFallback) {
+    const list = samplePhotos().filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
+    photosByProperty.set(propertyId, list);
+    return list;
+  }
+  const supabase = getSupabase();
+  const property = properties.find(item => item.id === propertyId);
+  if (!supabase) {
+    const list = thumbnailAsPhotos(property);
+    photosByProperty.set(propertyId, list);
+    return list;
+  }
+  const { data, error } = await supabase
+    .from('property_photos')
+    .select('*')
+    .eq('property_id', propertyId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (sampleMode) {
+      const list = samplePhotos().filter(item => item.propertyId === fallbackPropertyIdFor(property)).map(item => ({
+        ...item,
+        propertyId
+      }));
+      photosByProperty.set(propertyId, list.length ? list : thumbnailAsPhotos(property));
+      return photosByProperty.get(propertyId);
+    }
+    const list = thumbnailAsPhotos(property);
+    photosByProperty.set(propertyId, list);
+    return list;
+  }
+  const list = (data || []).map(fromPhotoRow);
+  photosByProperty.set(propertyId, list);
+  return list;
+}
+
+async function loadAppliances(propertyId) {
+  if (sampleMode && usingSampleFallback) {
+    const list = sampleAppliances().filter(item => item.propertyId === propertyId).map(item => ({ ...item }));
+    appliancesByProperty.set(propertyId, list);
+    return list;
+  }
+  const supabase = getSupabase();
+  const property = properties.find(item => item.id === propertyId);
+  if (!supabase) {
+    appliancesByProperty.set(propertyId, []);
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('property_appliances')
+    .select('*')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (sampleMode) {
+      const list = sampleAppliances().filter(item => item.propertyId === fallbackPropertyIdFor(property)).map(item => ({
+        ...item,
+        propertyId
+      }));
+      appliancesByProperty.set(propertyId, list);
+      return list;
+    }
+    appliancesByProperty.set(propertyId, []);
+    return [];
+  }
+  const list = (data || []).map(fromApplianceRow);
+  appliancesByProperty.set(propertyId, list);
+  return list;
+}
+
+async function loadTenant(propertyId) {
+  if (sampleMode && usingSampleFallback) {
+    const tenant = sampleTenants().find(item => item.propertyId === propertyId) || null;
+    tenantByProperty.set(propertyId, tenant ? { ...tenant } : null);
+    return tenantByProperty.get(propertyId);
+  }
+  const supabase = getSupabase();
+  const property = properties.find(item => item.id === propertyId);
+  if (!supabase) {
+    const tenant = contactAsTenant(property);
+    tenantByProperty.set(propertyId, tenant);
+    return tenant;
+  }
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('*')
+    .eq('property_id', propertyId)
+    .maybeSingle();
+  if (error) {
+    if (sampleMode) {
+      const tenant = sampleTenants().find(item => item.propertyId === fallbackPropertyIdFor(property)) || null;
+      tenantByProperty.set(propertyId, tenant ? { ...tenant, propertyId } : null);
+      return tenantByProperty.get(propertyId);
+    }
+    const tenant = contactAsTenant(property);
+    tenantByProperty.set(propertyId, tenant);
+    return tenant;
+  }
+  const tenant = data ? fromTenantRow(data) : null;
+  tenantByProperty.set(propertyId, tenant);
+  return tenant;
+}
+
+async function loadTenantFiles(tenantId) {
+  if (!tenantId) return [];
+  if (sampleMode && usingSampleFallback) {
+    const list = sampleTenantFiles().filter(item => item.tenantId === tenantId).map(item => ({ ...item }));
+    tenantFilesByTenant.set(tenantId, list);
+    return list;
+  }
+  const supabase = getSupabase();
+  if (!supabase) {
+    tenantFilesByTenant.set(tenantId, []);
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('tenant_files')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (sampleMode) {
+      const list = sampleTenantFiles().filter(item => item.tenantId === tenantId).map(item => ({ ...item }));
+      tenantFilesByTenant.set(tenantId, list);
+      return list;
+    }
+    tenantFilesByTenant.set(tenantId, []);
+    return [];
+  }
+  const list = (data || []).map(fromTenantFileRow);
+  tenantFilesByTenant.set(tenantId, list);
+  return list;
+}
+
+async function loadPropertyExtras(propertyId) {
+  const [photos, appliances, tenant] = await Promise.all([
+    loadPhotos(propertyId),
+    loadAppliances(propertyId),
+    loadTenant(propertyId)
+  ]);
+  if (tenant?.id) await loadTenantFiles(tenant.id).catch(() => []);
+  return { photos, appliances, tenant };
+}
+
 async function insertProperties(list) {
   if (!list.length) return;
   await writePropertyRows(list.map(toRow));
@@ -377,25 +718,119 @@ function homeOutline() {
   return `<span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><path d="M10 30L32 12l22 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 28v22h32V28" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M28 50V36h8v14" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg></span>`;
 }
 
-function askConfirm({ title, message, confirmLabel = 'Confirm' }) {
+function askConfirm({ title, message, confirmLabel = 'Confirm', discardLabel = '' }) {
   return new Promise(resolve => {
     if (confirmResolve) confirmResolve(false);
     confirmResolve = resolve;
     const titleEl = document.querySelector('#confirmTitle');
     const messageEl = document.querySelector('#confirmMessage');
     const yes = document.querySelector('#confirmYes');
+    const discard = document.querySelector('#confirmDiscard');
     if (titleEl) titleEl.textContent = title;
     if (messageEl) messageEl.textContent = message;
-    if (yes) yes.textContent = confirmLabel;
+    if (yes) {
+      yes.textContent = confirmLabel;
+      yes.classList.toggle('danger', !discardLabel);
+    }
+    if (discard) {
+      discard.hidden = !discardLabel;
+      discard.textContent = discardLabel || 'Discard';
+    }
     if (confirmSheet) confirmSheet.hidden = false;
   });
 }
 
 function settleConfirm(ok) {
   if (confirmSheet) confirmSheet.hidden = true;
+  const discard = document.querySelector('#confirmDiscard');
+  if (discard) discard.hidden = true;
   const resolve = confirmResolve;
   confirmResolve = null;
-  if (resolve) resolve(Boolean(ok));
+  if (resolve) resolve(ok);
+}
+
+function activeDetailForm() {
+  return document.querySelector('#propertyDetailForm') || document.querySelector('#tenantForm');
+}
+
+function isDetailDirty() {
+  return detailDirty || activeDetailForm()?.dataset.dirty === '1';
+}
+
+function setDetailDirty(dirty) {
+  detailDirty = dirty;
+  const form = activeDetailForm();
+  if (form) form.dataset.dirty = dirty ? '1' : '';
+  const bar = document.querySelector('#detailSaveBar');
+  if (bar) bar.hidden = !dirty;
+}
+
+function captureDetailDraft() {
+  const form = activeDetailForm();
+  if (!form || !isDetailDirty()) return null;
+  return { tab: detailTab, values: Object.fromEntries(new FormData(form).entries()) };
+}
+
+function restoreDetailDraft(draft) {
+  if (!draft || draft.tab !== detailTab) return;
+  const form = activeDetailForm();
+  if (!form) return;
+  Object.entries(draft.values).forEach(([key, value]) => {
+    const field = form.elements[key];
+    if (!field) return;
+    if (field instanceof RadioNodeList) {
+      [...field].forEach(input => { input.checked = input.value === value; });
+    } else if (field.type === 'radio') {
+      const match = form.querySelector(`[name="${key}"][value="${value}"]`);
+      if (match) match.checked = true;
+    } else {
+      field.value = value;
+    }
+  });
+  setDetailDirty(true);
+}
+
+function bindDetailDirty() {
+  const form = activeDetailForm();
+  if (!form) return;
+  const mark = () => setDetailDirty(true);
+  form.addEventListener('input', mark);
+  form.addEventListener('change', mark);
+}
+
+function syncStickyOffset() {
+  const banner = document.querySelector('#sampleBanner');
+  const height = sampleMode && banner && !banner.hidden ? Math.ceil(banner.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--detail-sticky-top', `${height}px`);
+}
+
+async function confirmLeaveDirtyTab() {
+  if (!isDetailDirty()) return 'ok';
+  const result = await askConfirm({
+    title: 'Save changes?',
+    message: 'You have unsaved edits on this tab.',
+    confirmLabel: 'Save',
+    discardLabel: 'Discard'
+  });
+  if (result === true) {
+    const saved = await saveActiveDetailForm();
+    return saved ? 'ok' : 'cancel';
+  }
+  if (result === 'discard') {
+    setDetailDirty(false);
+    return 'ok';
+  }
+  return 'cancel';
+}
+
+async function switchDetailTab(next) {
+  const tab = DETAIL_TABS_SAFE.has(next) ? next : 'property';
+  if (tab === detailTab) return;
+  if (await confirmLeaveDirtyTab() !== 'ok') return;
+  detailTab = tab;
+  if (detailTab !== 'tenant') tenantEditorOpen = false;
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (property) renderDetail(property);
 }
 
 function currency(value) {
@@ -442,6 +877,7 @@ function showView(view) {
 
 function updateSampleChrome() {
   document.body.classList.toggle('sample-mode', sampleMode);
+  syncStickyOffset();
   const banner = document.querySelector('#sampleBanner');
   const signedIn = Boolean(getUser() && getAccount());
   if (banner) banner.hidden = !sampleMode;
@@ -528,10 +964,11 @@ function renderList() {
   hydrateThumbs(propertyList);
 }
 
-function contactButton(label, value, scheme, icon) {
-  if (!value) return `<span class="contact-button disabled" aria-disabled="true"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</span>`;
-  const href = scheme === 'mailto' ? `mailto:${encodeURIComponent(value)}` : `${scheme}:${scheme === 'tel' || scheme === 'sms' ? value.replace(/[^+\d]/g, '') : value}`;
-  return `<a class="contact-button" href="${escapeHTML(href)}"><span aria-hidden="true">${icon}</span>&nbsp; ${label}</a>`;
+function existingTenantName(propertyId) {
+  if (!propertyId) return '';
+  const tenant = tenantByProperty.get(propertyId);
+  if (hasCurrentTenant(tenant)) return tenant.name || '';
+  return properties.find(item => item.id === propertyId)?.tenantName || '';
 }
 
 function expenseSummary(list) {
@@ -559,6 +996,7 @@ async function applySamplePath() {
     return;
   }
   if (route.expenseId) {
+    detailTab = 'expenses';
     const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id).catch(() => []);
     const expense = expenses.find(item => item.id === route.expenseId);
     if (expense) {
@@ -585,8 +1023,48 @@ function expenseRow(expense) {
     </button>`;
 }
 
+function expensesPanelHtml(property, expenses, write) {
+  return `<section class="expense-section">
+        <div class="section-heading">
+          <div>
+            <h3>Expenses</h3>
+            <p class="muted">${expenses.length ? escapeHTML(expenseSummary(expenses)) : 'No expenses yet.'}</p>
+            ${write ? '<p class="muted">People on this account can see these expenses and receipts.</p>' : ''}
+          </div>
+          <div class="heading-actions">
+            ${expenses.length ? `<button class="secondary-button compact" type="button" data-action="export-expenses" data-id="${escapeHTML(property.id)}">Export</button>` : ''}
+            ${write ? `<button class="primary-button compact js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">＋ Add</button>` : ''}
+          </div>
+        </div>
+        ${expenses.length
+          ? `<div class="expense-list">${expenses.map(expenseRow).join('')}</div>`
+          : (write ? `<button class="text-button muted-link js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">Add an expense</button>` : '')}
+      </section>`;
+}
+
+const DETAIL_TABS_SAFE = new Set(['property', 'tenant', 'expenses']);
+
+function propertyTabPanel(property, write, { expenses = [], tenant = null } = {}) {
+  const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
+  const appliances = appliancesByProperty.get(property.id) || [];
+  return propertyTabHtml({
+    property,
+    photos,
+    appliances,
+    expenses,
+    tenant,
+    write,
+    sample: sampleMode,
+    expenseSummary: expenses.length
+      ? `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'} · ${money(expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))}`
+      : ''
+  });
+}
+
 async function renderDetail(property) {
   if (!property) { showView('list'); return; }
+  const draft = captureDetailDraft();
+  detailPropertyId = property.id;
   let expenses = expensesByProperty.get(property.id);
   if (!expenses) {
     try {
@@ -597,44 +1075,50 @@ async function renderDetail(property) {
       showToast(friendlyError(error));
     }
   }
+  try {
+    await loadPropertyExtras(property.id);
+  } catch (error) {
+    showToast(friendlyError(error));
+  }
   const write = canWrite();
-  const heroAction = write ? 'photo-sheet' : (property.thumbnailPath ? 'view-hero' : '');
+  const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
+  const cover = photos.find(item => item.isPrimary) || photos[0];
+  const heroPath = cover?.storagePath || property.thumbnailPath || '';
+  const heroProperty = { ...property, thumbnailPath: heroPath };
+  const heroAction = heroPath ? 'view-hero' : (write ? 'add-gallery-photo' : '');
+  const tenant = tenantByProperty.get(property.id);
+  const files = tenant?.id ? (tenantFilesByTenant.get(tenant.id) || []) : [];
+  const tab = DETAIL_TABS_SAFE.has(detailTab) ? detailTab : 'property';
+  let panel = '';
+  if (tab === 'tenant') {
+    panel = tenantTabHtml({ property, tenant, files, write, editing: write && tenantEditorOpen });
+  } else if (tab === 'expenses') {
+    panel = expensesPanelHtml(property, expenses, write);
+  } else {
+    panel = propertyTabPanel(property, write, { expenses, tenant });
+  }
   detailView.innerHTML = `
       <button class="back-link" type="button" data-action="back-to-list"><span aria-hidden="true">‹</span> Back to properties</button>
       <button class="hero-photo-wrap" type="button" data-action="${heroAction}" data-id="${escapeHTML(property.id)}" ${heroAction ? '' : 'disabled'}>
-        ${thumbMarkup(property, 'hero')}
+        ${thumbMarkup(heroProperty, 'hero')}
         <span class="upload-bar" hidden><span></span></span>
       </button>
-      <div class="detail-header">
-        <span class="badge ${property.status}">${property.status === 'occupied' ? 'Occupied' : 'Vacant'}</span>
-        <h2 id="detailHeading">${escapeHTML(property.address)}</h2>
-        <p class="detail-address">${escapeHTML(propertyLocation(property))}</p>
-        ${property.status === 'occupied' && property.tenantName ? `<p class="muted">Tenant: <strong>${escapeHTML(property.tenantName)}</strong></p>` : ''}
+      <div class="detail-sticky">
+        ${detailHeaderHtml(property, { location: propertyLocation(property), rent: currency(property.rent), write })}
+        ${detailTabsHtml(tab)}
       </div>
-      <div class="detail-grid">
-        <div class="info-card"><h3>Contact tenant</h3><div class="contact-actions">${contactButton('Call', property.phone, 'tel', '☎')} ${contactButton('Text', property.phone, 'sms', '▣')} ${contactButton('Email', property.email, 'mailto', '✉')}</div>${property.status === 'vacant' && write ? '<p class="muted contact-hint">Add a tenant phone or email on Edit to enable these.</p>' : ''}</div>
-        ${currency(property.rent) ? `<div class="info-card"><span class="info-label">Monthly rent</span><p class="rent-value">${escapeHTML(currency(property.rent))}</p></div>` : ''}
-        ${property.notes ? `<div class="info-card"><h3>Notes</h3><p>${escapeHTML(property.notes)}</p></div>` : ''}
-      </div>
-      <section class="expense-section">
-        <div class="section-heading">
-          <div>
-            <h3>Expenses</h3>
-            <p class="muted">${expenses.length ? escapeHTML(expenseSummary(expenses)) : 'No expenses yet.'}</p>
-            ${canWrite() ? '<p class="muted">People on this account can see these expenses and receipts.</p>' : ''}
-          </div>
-          <div class="heading-actions">
-            ${expenses.length ? `<button class="secondary-button compact" type="button" data-action="export-expenses" data-id="${escapeHTML(property.id)}">Export</button>` : ''}
-            ${write ? `<button class="primary-button compact js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">＋ Add</button>` : ''}
-          </div>
-        </div>
-        ${expenses.length
-          ? `<div class="expense-list">${expenses.map(expenseRow).join('')}</div>`
-          : (write ? `<button class="text-button muted-link js-write" type="button" data-action="add-expense" data-id="${escapeHTML(property.id)}">Add an expense</button>` : '')}
-      </section>
-      ${write ? `<div class="detail-actions js-write"><button class="primary-button" type="button" data-action="edit" data-id="${escapeHTML(property.id)}">Edit property</button><button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>` : `<div class="detail-actions"><button class="secondary-button" type="button" data-action="back-to-list">Done</button></div>`}`;
+      <div class="detail-panel" role="tabpanel" id="panel-${tab}" aria-labelledby="tab-${tab}">${panel}</div>`;
   showView('detail');
+  syncStickyOffset();
   hydrateThumbs(detailView);
+  const applianceForm = document.querySelector('#applianceForm');
+  if (applianceForm) applianceForm.addEventListener('submit', submitAppliance);
+  const propertyForm = document.querySelector('#propertyDetailForm');
+  if (propertyForm) propertyForm.addEventListener('submit', submitPropertyDetail);
+  const tenantForm = document.querySelector('#tenantForm');
+  if (tenantForm) tenantForm.addEventListener('submit', submitTenant);
+  bindDetailDirty();
+  restoreDetailDraft(draft);
 }
 
 function renderFormPhoto(property) {
@@ -700,23 +1184,120 @@ function readForm() {
   if (!data.address || !data.city || !data.state || !data.zip) return { error: 'Please fill in the required property fields.' };
   if (!data.status) return { error: 'Please choose whether this home is occupied or vacant.' };
   if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
-  if (data.status === 'occupied' && !data.tenantName) return { error: 'Please add the tenant name for an occupied home.' };
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return { error: 'Please enter a valid email address.' };
+  if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
+  return { data: { ...data, state: data.state.toUpperCase(), tenantName: existingTenantName(editingId), phone: '', email: '' } };
+}
+
+function readPropertyDetail(formEl) {
+  const data = Object.fromEntries(new FormData(formEl).entries());
+  Object.keys(data).forEach(key => { if (typeof data[key] === 'string') data[key] = data[key].trim(); });
+  if (!data.address || !data.city || !data.state || !data.zip) return { error: 'Please fill in the required property fields.' };
+  if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
   if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
   return { data: { ...data, state: data.state.toUpperCase() } };
+}
+
+function showPropertyDetailError(message) {
+  const box = document.querySelector('#propertyDetailError');
+  if (!box) {
+    showToast(message);
+    return;
+  }
+  box.textContent = message;
+  box.hidden = false;
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function submitPropertyDetail(event) {
+  event.preventDefault();
+  return savePropertyDetail();
+}
+
+async function savePropertyDetail() {
+  if (!canWrite()) return false;
+  const formEl = document.querySelector('#propertyDetailForm');
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (!formEl || !property) return false;
+  const result = readPropertyDetail(formEl);
+  if (result.error) { showPropertyDetailError(result.error); return false; }
+  const submit = formEl.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const saved = { ...property, ...result.data, updatedAt: new Date().toISOString() };
+    await writePropertyRows([toRow(saved)], { existingId: saved.id });
+    await loadProperties();
+    setDetailDirty(false);
+    showToast('Property saved.');
+    const next = properties.find(item => item.id === saved.id) || saved;
+    renderDetail(next);
+    return true;
+  } catch (error) {
+    showPropertyDetailError(friendlyError(error));
+    return false;
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function saveActiveDetailForm() {
+  if (detailTab === 'tenant') return saveTenantFromForm();
+  if (detailTab === 'property') return savePropertyDetail();
+  return true;
 }
 
 async function savePropertyPhoto(property) {
   if (!pendingPhotoFile) return property;
   const file = await compressImageFile(pendingPhotoFile);
-  const path = thumbnailObjectPath(activeAccountId(), property.id, extensionForType(file.type, 'jpg'));
-  await uploadAccountMedia(path, file);
-  if (property.thumbnailPath && property.thumbnailPath !== path) {
-    try { await removeAccountMedia(property.thumbnailPath); } catch (_) { /* keep new photo */ }
+  const saved = await addGalleryPhoto(property, file);
+  pendingPhotoFile = null;
+  return saved;
+}
+
+function galleryPhotoCount(propertyId) {
+  return (photosByProperty.get(propertyId) || []).length;
+}
+
+async function addGalleryPhoto(property, file) {
+  const existingCount = galleryPhotoCount(property.id);
+  if (existingCount >= GALLERY_SOFT_CAP) {
+    showToast('You can add up to 10 photos.');
+    return property;
   }
-  const { error } = await getSupabase().from('properties').update({ thumbnail_path: path }).eq('id', property.id);
-  if (error) throw error;
-  return { ...property, thumbnailPath: path };
+  const ready = await compressImageFile(file);
+  const photoId = makeId();
+  const ext = extensionForType(ready.type, 'jpg');
+  const galleryPath = galleryPhotoPath(activeAccountId(), property.id, photoId, ext);
+  const existing = photosByProperty.get(property.id) || await loadPhotos(property.id).catch(() => []);
+  const makePrimary = existing.length === 0;
+  let path = galleryPath;
+  try {
+    await uploadAccountMedia(galleryPath, ready);
+  } catch (error) {
+    path = thumbnailObjectPath(activeAccountId(), property.id, ext);
+    await uploadAccountMedia(path, ready);
+  }
+  const supabase = getSupabase();
+  const row = {
+    id: photoId,
+    account_id: activeAccountId(),
+    property_id: property.id,
+    storage_path: path,
+    sort_order: existing.length,
+    is_primary: makePrimary
+  };
+  const inserted = await supabase.from('property_photos').insert(row);
+  if (inserted.error) {
+    if (!isSchemaSetupError(inserted.error) && !isMissingColumnError(inserted.error)) throw inserted.error;
+    const { error } = await supabase.from('properties').update({ thumbnail_path: path }).eq('id', property.id);
+    if (error) throw error;
+    return { ...property, thumbnailPath: path };
+  }
+  if (makePrimary) {
+    const { error } = await supabase.from('properties').update({ thumbnail_path: path }).eq('id', property.id);
+    if (error && !isMissingColumnError(error, 'thumbnail_path')) throw error;
+  }
+  await loadPhotos(property.id);
+  return { ...property, thumbnailPath: makePrimary ? path : property.thumbnailPath };
 }
 
 async function submitForm(event) {
@@ -738,9 +1319,14 @@ async function submitForm(event) {
     pendingPhotoFile = null;
     revokeObjectUrl(pendingPhotoPreview);
     pendingPhotoPreview = '';
+    if (withPhoto.status === 'vacant') await syncTenantFromProperty(withPhoto);
     await loadProperties();
     showToast(existing ? 'Property updated.' : 'Property added.');
-    renderDetail(properties.find(property => property.id === withPhoto.id) || withPhoto);
+    const next = properties.find(property => property.id === withPhoto.id) || withPhoto;
+    const needTenant = next.status === 'occupied' && !hasCurrentTenant(tenantByProperty.get(next.id));
+    detailTab = needTenant ? 'tenant' : 'property';
+    tenantEditorOpen = needTenant;
+    renderDetail(next);
   } catch (error) {
     showFormError(friendlyError(error));
   } finally {
@@ -751,18 +1337,26 @@ async function submitForm(event) {
 async function collectPropertyMediaPaths(property) {
   const paths = [];
   if (property.thumbnailPath) paths.push(property.thumbnailPath);
+  const photos = photosByProperty.get(property.id) || await loadPhotos(property.id).catch(() => []);
+  photos.forEach(photo => { if (photo.storagePath) paths.push(photo.storagePath); });
+  const tenant = tenantByProperty.get(property.id) || await loadTenant(property.id).catch(() => null);
+  if (tenant?.leaseStoragePath) paths.push(tenant.leaseStoragePath);
+  if (tenant?.id) {
+    const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id).catch(() => []);
+    files.forEach(file => { if (file.storagePath) paths.push(file.storagePath); });
+  }
   const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id).catch(() => []);
   for (const expense of expenses) {
     const receipts = receiptsByExpense.get(expense.id) || await loadReceipts(expense.id).catch(() => []);
     receipts.forEach(receipt => { if (receipt.storagePath) paths.push(receipt.storagePath); });
   }
-  return paths;
+  return [...new Set(paths)];
 }
 
-async function deleteProperty() {
+async function deleteProperty(propertyId = editingId) {
   if (!canWrite()) return;
-  const property = properties.find(item => item.id === editingId);
-  if (!property || !window.confirm(`Delete ${property.address}? This cannot be undone.`)) return;
+  const property = properties.find(item => item.id === propertyId);
+  if (!property || !await askConfirm({ title: 'Delete property', message: `Delete ${property.address}? This cannot be undone.`, confirmLabel: 'Delete property' })) return;
   try {
     const paths = await collectPropertyMediaPaths(property);
     const { error } = await getSupabase().from('properties').delete().eq('id', property.id);
@@ -777,23 +1371,36 @@ async function deleteProperty() {
   }
 }
 
-function openPhotoSheet(property, context = 'detail') {
+function openPhotoSheet(property, context = 'detail', photoId = null) {
   if (!property) return;
+  const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
+  const selected = photoId ? photos.find(item => item.id === photoId) : null;
   if (sampleMode) {
-    if (property.thumbnailPath) viewMedia(property.thumbnailPath, property.address);
+    const path = selected?.storagePath || property.thumbnailPath;
+    if (path) viewMedia(path, property.address);
     return;
   }
-  if (!canWrite()) return;
+  if (!canWrite() && !selected) return;
   photoContext = context;
+  galleryPhotoId = selected?.id || null;
   editingId = property.id;
   const remove = document.querySelector('#removePhotoButton');
-  if (remove) remove.hidden = !property.thumbnailPath && !pendingPhotoFile;
+  const viewBtn = document.querySelector('#viewPhotoButton');
+  const primaryBtn = document.querySelector('#makePrimaryButton');
+  const title = document.querySelector('#photoSheetTitle');
+  if (title) title.textContent = selected ? 'Photo' : 'Add photo';
+  if (remove) remove.hidden = context === 'form' ? !property.thumbnailPath && !pendingPhotoFile : !selected;
+  if (viewBtn) viewBtn.hidden = !selected;
+  if (primaryBtn) primaryBtn.hidden = !selected || selected.isPrimary || !canWrite();
   photoSheet.hidden = false;
 }
 
 function closeSheets() {
   if (photoSheet) photoSheet.hidden = true;
   if (receiptSheet) receiptSheet.hidden = true;
+  filePickerContext = 'receipt';
+  const receiptTitle = document.querySelector('#receiptSheetTitle');
+  if (receiptTitle) receiptTitle.textContent = 'Add receipt';
   closeExportSheets();
 }
 
@@ -931,12 +1538,45 @@ async function applyPickedPhoto(file) {
   if (bar) bar.hidden = false;
   uploadBusy = true;
   try {
-    pendingPhotoFile = file;
-    const updated = await savePropertyPhoto(property);
-    pendingPhotoFile = null;
+    await addGalleryPhoto(property, file);
     await loadProperties();
     showToast('Photo saved.');
-    renderDetail(properties.find(item => item.id === updated.id) || updated);
+    renderDetail(properties.find(item => item.id === property.id) || property);
+  } catch (error) {
+    showToast(friendlyError(error));
+  } finally {
+    uploadBusy = false;
+    if (bar) bar.hidden = true;
+  }
+}
+
+async function applyPickedPhotos(fileList) {
+  const files = [...(fileList || [])].filter(Boolean);
+  if (!files.length) return;
+  if (photoContext === 'form' || currentView === 'form') {
+    await applyPickedPhoto(files[0]);
+    return;
+  }
+  const property = properties.find(item => item.id === editingId);
+  if (!property || !canWrite()) return;
+  const room = GALLERY_SOFT_CAP - galleryPhotoCount(property.id);
+  if (room <= 0) {
+    showToast('You can add up to 10 photos.');
+    return;
+  }
+  const accepted = files.slice(0, room);
+  if (accepted.length < files.length) showToast('You can add up to 10 photos.');
+  closeSheets();
+  const bar = detailView.querySelector('.upload-bar');
+  if (bar) bar.hidden = false;
+  uploadBusy = true;
+  try {
+    for (const file of accepted) {
+      await addGalleryPhoto(property, file);
+    }
+    await loadProperties();
+    showToast(accepted.length > 1 ? 'Photos saved.' : 'Photo saved.');
+    renderDetail(properties.find(item => item.id === property.id) || property);
   } catch (error) {
     showToast(friendlyError(error));
   } finally {
@@ -967,17 +1607,57 @@ async function removePropertyPhoto() {
     renderFormPhoto(properties.find(item => item.id === property?.id) || property);
     return;
   }
-  if (!property?.thumbnailPath || !await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) return;
+  const photos = photosByProperty.get(property?.id) || [];
+  const selected = galleryPhotoId ? photos.find(item => item.id === galleryPhotoId) : (photos.find(item => item.isPrimary) || photos[0]);
+  if (lightbox) lightbox.hidden = true;
+  if (!property || !selected || !await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) return;
   try {
-    await removeAccountMedia(property.thumbnailPath);
-    const { error } = await getSupabase().from('properties').update({ thumbnail_path: null }).eq('id', property.id);
-    if (error) throw error;
+    if (!String(selected.id).startsWith('thumb-')) {
+      const { error } = await getSupabase().from('property_photos').delete().eq('id', selected.id);
+      if (error && !isSchemaSetupError(error)) throw error;
+    }
+    try { await removeAccountMedia(selected.storagePath); } catch (_) { /* row may already be gone */ }
+    const remaining = (photosByProperty.get(property.id) || []).filter(item => item.id !== selected.id);
+    const nextCover = remaining.find(item => item.isPrimary) || remaining[0];
+    await getSupabase().from('properties').update({ thumbnail_path: nextCover?.storagePath || null }).eq('id', property.id);
     await loadProperties();
+    await loadPhotos(property.id);
     showToast('Photo removed.');
     renderDetail(properties.find(item => item.id === property.id));
   } catch (error) {
     showToast(friendlyError(error));
   }
+}
+
+async function makePhotoPrimary() {
+  if (!canWrite()) return;
+  const property = properties.find(item => item.id === editingId);
+  const photos = photosByProperty.get(property?.id) || [];
+  const selected = photos.find(item => item.id === galleryPhotoId);
+  closeSheets();
+  if (lightbox) lightbox.hidden = true;
+  if (!property || !selected) return;
+  try {
+    const supabase = getSupabase();
+    await supabase.from('property_photos').update({ is_primary: false }).eq('property_id', property.id);
+    const { error } = await supabase.from('property_photos').update({ is_primary: true }).eq('id', selected.id);
+    if (error) throw error;
+    await supabase.from('properties').update({ thumbnail_path: selected.storagePath }).eq('id', property.id);
+    await loadProperties();
+    await loadPhotos(property.id);
+    showToast('List photo updated.');
+    renderDetail(properties.find(item => item.id === property.id) || property);
+  } catch (error) {
+    showToast(friendlyError(error));
+  }
+}
+
+async function viewSelectedGalleryPhoto() {
+  const property = properties.find(item => item.id === editingId);
+  const photos = photosByProperty.get(property?.id) || [];
+  const selected = photos.find(item => item.id === galleryPhotoId) || photos.find(item => item.isPrimary);
+  closeSheets();
+  if (selected?.storagePath) viewMedia(selected.storagePath, property?.address || '');
 }
 
 function categoryChips(selected) {
@@ -1153,6 +1833,10 @@ async function saveReceiptForExpense(property, expense, file = pendingReceiptFil
 
 async function applyPickedReceipt(file) {
   if (!file || !canWrite()) return;
+  if (filePickerContext === 'lease' || filePickerContext === 'correspondence') {
+    await applyPickedTenantFile(file);
+    return;
+  }
   closeSheets();
   const receiptError = document.querySelector('#receiptError');
   try {
@@ -1229,7 +1913,7 @@ async function deleteExpense(propertyId, expenseId) {
   }
 }
 
-async function viewMedia(path, alt = '') {
+async function viewMedia(path, alt = '', { gallery = false } = {}) {
   const url = await resolveMediaUrl(path);
   if (!url) {
     showToast('Could not open that file.');
@@ -1244,7 +1928,300 @@ async function viewMedia(path, alt = '') {
     image.src = url;
     image.alt = alt || '';
   }
+  const actions = document.querySelector('#lightboxActions');
+  if (actions) actions.hidden = !(gallery && canWrite());
   lightbox.hidden = false;
+}
+
+async function syncTenantFromProperty(property) {
+  if (!canWrite() || !property) return;
+  const supabase = getSupabase();
+  if (!supabase) return;
+  let existing = tenantByProperty.get(property.id);
+  if (existing === undefined) existing = await loadTenant(property.id).catch(() => null);
+  const vacant = property.status === 'vacant';
+  if (vacant) {
+    if (existing?.id && !String(existing.id).startsWith('legacy-')) {
+      const { error } = await supabase.from('tenants').delete().eq('id', existing.id);
+      if (error && !isSchemaSetupError(error)) throw error;
+    }
+    tenantByProperty.set(property.id, null);
+    return;
+  }
+  const row = {
+    account_id: activeAccountId(),
+    property_id: property.id,
+    name: property.tenantName || '',
+    phone: property.phone || '',
+    email: property.email || ''
+  };
+  if (existing?.id && !String(existing.id).startsWith('legacy-')) {
+    const { error } = await supabase.from('tenants').update(row).eq('id', existing.id);
+    if (error && !isSchemaSetupError(error)) throw error;
+  } else {
+    row.id = makeId();
+    const { error } = await supabase.from('tenants').insert(row);
+    if (error && !isSchemaSetupError(error)) throw error;
+  }
+}
+
+async function refreshPropertyAfterTenant(propertyId) {
+  await loadProperties();
+  await loadTenant(propertyId);
+  const tenant = tenantByProperty.get(propertyId);
+  if (tenant?.id) await loadTenantFiles(tenant.id).catch(() => []);
+  renderDetail(properties.find(item => item.id === propertyId));
+}
+
+async function submitTenant(event) {
+  event.preventDefault();
+  await saveTenantFromForm();
+}
+
+async function saveTenantFromForm() {
+  if (!canWrite()) return false;
+  const property = properties.find(item => item.id === detailPropertyId);
+  const formEl = document.querySelector('#tenantForm');
+  if (!property || !formEl) return false;
+  const errorBox = document.querySelector('#tenantError');
+  const name = formEl.name.value.trim();
+  const phone = formEl.phone.value.trim();
+  const email = formEl.email.value.trim();
+  const notes = formEl.notes.value.trim().slice(0, 1000);
+  if (!name) {
+    if (errorBox) { errorBox.hidden = false; errorBox.textContent = 'Please add the tenant name.'; }
+    return false;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (errorBox) { errorBox.hidden = false; errorBox.textContent = 'Please enter a valid email address.'; }
+    return false;
+  }
+  const submit = formEl.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const supabase = getSupabase();
+    let existing = tenantByProperty.get(property.id);
+    if (existing === undefined) existing = await loadTenant(property.id).catch(() => null);
+    const row = {
+      account_id: activeAccountId(),
+      property_id: property.id,
+      name,
+      phone,
+      email,
+      notes
+    };
+    if (existing?.id && !String(existing.id).startsWith('legacy-')) {
+      const { error } = await supabase.from('tenants').update(row).eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      row.id = makeId();
+      const { error } = await supabase.from('tenants').insert(row);
+      if (error) throw error;
+    }
+    const { error } = await supabase.from('properties').update({
+      status: 'occupied',
+      tenant_name: name,
+      phone,
+      email
+    }).eq('id', property.id);
+    if (error) throw error;
+    tenantEditorOpen = false;
+    setDetailDirty(false);
+    showToast('Tenant saved.');
+    await refreshPropertyAfterTenant(property.id);
+    return true;
+  } catch (error) {
+    if (errorBox) {
+      errorBox.hidden = false;
+      errorBox.textContent = friendlyError(error);
+    } else showToast(friendlyError(error));
+    return false;
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function markPropertyVacant(propertyId, { fromStatus = false } = {}) {
+  if (!canWrite()) return false;
+  const asked = fromStatus
+    ? await askConfirm({ title: 'Remove tenant record?', message: 'Remove tenant record? Lease copies and letters for this home will be deleted.', confirmLabel: 'Remove tenant' })
+    : await askConfirm({ title: 'Remove tenant', message: 'Remove tenant info and files for this home?', confirmLabel: 'Remove tenant' });
+  if (!asked) return false;
+  try {
+    const supabase = getSupabase();
+    const tenant = tenantByProperty.get(propertyId) || await loadTenant(propertyId);
+    if (tenant?.id && !String(tenant.id).startsWith('legacy-')) {
+      const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id).catch(() => []);
+      const paths = [...files.map(item => item.storagePath), tenant.leaseStoragePath].filter(Boolean);
+      const { error } = await supabase.from('tenants').delete().eq('id', tenant.id);
+      if (error) throw error;
+      try { await removeAccountMedia(paths); } catch (_) { /* rows gone */ }
+    }
+    const { error } = await supabase.from('properties').update({
+      status: 'vacant',
+      tenant_name: '',
+      phone: '',
+      email: ''
+    }).eq('id', propertyId);
+    if (error) throw error;
+    tenantByProperty.set(propertyId, null);
+    tenantEditorOpen = false;
+    showToast('Home is vacant.');
+    await refreshPropertyAfterTenant(propertyId);
+    return true;
+  } catch (error) {
+    showToast(friendlyError(error));
+    return false;
+  }
+}
+
+function openFileSheet(kind) {
+  if (!canWrite()) return;
+  filePickerContext = kind;
+  const title = document.querySelector('#receiptSheetTitle');
+  if (title) title.textContent = kind === 'lease' ? 'Add lease' : 'Add a copy';
+  if (receiptSheet) receiptSheet.hidden = false;
+}
+
+async function applyPickedTenantFile(file) {
+  closeSheets();
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (!property) return;
+  let tenant = tenantByProperty.get(property.id);
+  if (!tenant?.id || String(tenant.id).startsWith('legacy-')) {
+    showToast('Save the tenant first, then add files.');
+    return;
+  }
+  const ready = isPdf(file) ? assertPdfSize(file) : await compressImageFile(file);
+  const ext = extensionForType(ready.type, isPdf(ready) ? 'pdf' : 'jpg');
+  const supabase = getSupabase();
+  try {
+    if (filePickerContext === 'lease') {
+      const path = leaseObjectPath(activeAccountId(), property.id, ext);
+      await uploadAccountMedia(path, ready);
+      if (tenant.leaseStoragePath && tenant.leaseStoragePath !== path) {
+        try { await removeAccountMedia(tenant.leaseStoragePath); } catch (_) { /* keep new file */ }
+      }
+      const { error } = await supabase.from('tenants').update({
+        lease_storage_path: path,
+        lease_content_type: isPdf(ready) ? 'application/pdf' : (ready.type || ''),
+        lease_file_name: ready.name || `lease.${ext}`
+      }).eq('id', tenant.id);
+      if (error) throw error;
+      showToast('Lease saved.');
+    } else {
+      const fileId = makeId();
+      const path = tenantFileObjectPath(activeAccountId(), property.id, fileId, ext);
+      await uploadAccountMedia(path, ready);
+      const { error } = await supabase.from('tenant_files').insert({
+        id: fileId,
+        account_id: activeAccountId(),
+        tenant_id: tenant.id,
+        property_id: property.id,
+        kind: 'correspondence',
+        storage_path: path,
+        content_type: isPdf(ready) ? 'application/pdf' : (ready.type || ''),
+        file_name: ready.name || `file.${ext}`
+      });
+      if (error) throw error;
+      showToast('Copy saved.');
+    }
+    filePickerContext = 'receipt';
+    await refreshPropertyAfterTenant(property.id);
+  } catch (error) {
+    filePickerContext = 'receipt';
+    showToast(friendlyError(error));
+  }
+}
+
+async function removeLease() {
+  if (!canWrite()) return;
+  const property = properties.find(item => item.id === detailPropertyId);
+  const tenant = tenantByProperty.get(property?.id);
+  if (!tenant?.leaseStoragePath || !await askConfirm({ title: 'Remove lease', message: 'Remove this lease file?', confirmLabel: 'Remove' })) return;
+  try {
+    const { error } = await getSupabase().from('tenants').update({
+      lease_storage_path: null,
+      lease_content_type: '',
+      lease_file_name: ''
+    }).eq('id', tenant.id);
+    if (error) throw error;
+    try { await removeAccountMedia(tenant.leaseStoragePath); } catch (_) { /* row updated */ }
+    showToast('Lease removed.');
+    await refreshPropertyAfterTenant(property.id);
+  } catch (error) {
+    showToast(friendlyError(error));
+  }
+}
+
+async function deleteTenantFile(fileId) {
+  if (!canWrite()) return;
+  const property = properties.find(item => item.id === detailPropertyId);
+  const tenant = tenantByProperty.get(property?.id);
+  const files = tenantFilesByTenant.get(tenant?.id) || [];
+  const file = files.find(item => item.id === fileId);
+  if (!file || !await askConfirm({ title: 'Remove copy', message: 'Remove this file?', confirmLabel: 'Remove' })) return;
+  try {
+    const { error } = await getSupabase().from('tenant_files').delete().eq('id', file.id);
+    if (error) throw error;
+    try { await removeAccountMedia(file.storagePath); } catch (_) { /* row gone */ }
+    showToast('File removed.');
+    await refreshPropertyAfterTenant(property.id);
+  } catch (error) {
+    showToast(friendlyError(error));
+  }
+}
+
+async function submitAppliance(event) {
+  event.preventDefault();
+  if (!canWrite()) return;
+  const property = properties.find(item => item.id === detailPropertyId);
+  if (!property) return;
+  const formEl = event.currentTarget;
+  const name = formEl.name.value.trim();
+  const fuel = formEl.fuel.value || null;
+  const notes = formEl.notes.value.trim().slice(0, 200);
+  if (!name) {
+    showToast('Please name the appliance.');
+    return;
+  }
+  const submit = formEl.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  try {
+    const { error } = await getSupabase().from('property_appliances').insert({
+      id: makeId(),
+      account_id: activeAccountId(),
+      property_id: property.id,
+      name,
+      fuel,
+      notes
+    });
+    if (error) throw error;
+    showToast('Appliance added.');
+    await loadAppliances(property.id);
+    renderDetail(property);
+  } catch (error) {
+    showToast(friendlyError(error));
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function deleteAppliance(applianceId) {
+  if (!canWrite()) return;
+  if (!await askConfirm({ title: 'Remove appliance', message: 'Remove this appliance?', confirmLabel: 'Remove' })) return;
+  try {
+    const { error } = await getSupabase().from('property_appliances').delete().eq('id', applianceId);
+    if (error) throw error;
+    const property = properties.find(item => item.id === detailPropertyId);
+    showToast('Appliance removed.');
+    if (property) {
+      await loadAppliances(property.id);
+      renderDetail(property);
+    }
+  } catch (error) {
+    showToast(friendlyError(error));
+  }
 }
 
 async function viewReceipt(expenseId) {
@@ -1465,7 +2442,7 @@ function bindUi() {
     renderList();
   }));
   form.addEventListener('submit', submitForm);
-  deleteButton.addEventListener('click', deleteProperty);
+  deleteButton.addEventListener('click', () => deleteProperty());
   document.querySelector('#accountButton').addEventListener('click', openAccountMenu);
   document.querySelector('#backupButton').addEventListener('click', () => { accountPanel.hidden = true; backupPanel.hidden = false; });
   document.querySelector('#downloadButton').addEventListener('click', downloadBackup);
@@ -1491,15 +2468,16 @@ function bindUi() {
   document.querySelector('#exportShareButton')?.addEventListener('click', shareExportFile);
   document.querySelector('#exportSaveButton')?.addEventListener('click', saveExportFile);
   document.querySelector('#confirmYes')?.addEventListener('click', () => settleConfirm(true));
+  document.querySelector('#confirmDiscard')?.addEventListener('click', () => settleConfirm('discard'));
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (file) applyPickedPhoto(file);
   });
   document.querySelector('#photoLibraryInput')?.addEventListener('change', event => {
-    const file = event.target.files?.[0];
+    const files = event.target.files;
     event.target.value = '';
-    if (file) applyPickedPhoto(file);
+    if (files?.length) applyPickedPhotos(files);
   });
   document.querySelector('#receiptCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
@@ -1517,13 +2495,15 @@ function bindUi() {
     if (file) applyPickedReceipt(file);
   });
 
-  document.addEventListener('click', event => {
+  document.addEventListener('click', async event => {
     const photoChoice = event.target.closest('[data-photo]');
     if (photoChoice) {
       const choice = photoChoice.dataset.photo;
       if (choice === 'camera') document.querySelector('#photoCameraInput').click();
       if (choice === 'library') document.querySelector('#photoLibraryInput').click();
       if (choice === 'remove') removePropertyPhoto();
+      if (choice === 'view') viewSelectedGalleryPhoto();
+      if (choice === 'primary') makePhotoPrimary();
       return;
     }
     const receiptChoice = event.target.closest('[data-receipt]');
@@ -1546,6 +2526,8 @@ function bindUi() {
       if (action === 'add') { if (canWrite()) openForm(); }
       if (action === 'edit') { if (canWrite()) openForm(properties.find(property => property.id === actionTarget.dataset.id)); }
       if (action === 'back-to-list' || action === 'cancel-form') {
+        if (currentView === 'detail' && await confirmLeaveDirtyTab() !== 'ok') return;
+        setDetailDirty(false);
         if (sampleMode) goSample();
         else showView('list');
       }
@@ -1559,11 +2541,107 @@ function bindUi() {
       }
       if (action === 'clear-filters') { searchInput.value = ''; activeFilter = 'all'; document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all')); renderList(); }
       if (action === 'view-sample') enterSampleRoute();
-      if (action === 'photo-sheet') openPhotoSheet(properties.find(item => item.id === actionTarget.dataset.id), 'detail');
+      if (action === 'detail-tab') {
+        await switchDetailTab(actionTarget.dataset.tab);
+      }
+      if (action === 'goto-tenant') await switchDetailTab('tenant');
+      if (action === 'goto-expenses') await switchDetailTab('expenses');
+      if (action === 'set-status-occupied') {
+        const property = properties.find(item => item.id === detailPropertyId);
+        if (!property || property.status === 'occupied') return;
+        if (await confirmLeaveDirtyTab() !== 'ok') {
+          renderDetail(property);
+          return;
+        }
+        tenantEditorOpen = true;
+        detailTab = 'tenant';
+        renderDetail(property);
+      }
+      if (action === 'set-status-vacant') {
+        const property = properties.find(item => item.id === detailPropertyId);
+        const tenant = tenantByProperty.get(detailPropertyId);
+        if (!property || (property.status === 'vacant' && !hasCurrentTenant(tenant))) return;
+        if (await confirmLeaveDirtyTab() !== 'ok') {
+          renderDetail(property);
+          return;
+        }
+        const removed = await markPropertyVacant(property.id, { fromStatus: true });
+        if (!removed) renderDetail(properties.find(item => item.id === property.id) || property);
+      }
+      if (action === 'delete-property') deleteProperty(actionTarget.dataset.id || detailPropertyId);
+      if (action === 'add-gallery-photo') {
+        const property = properties.find(item => item.id === (actionTarget.dataset.id || detailPropertyId));
+        if (property) openPhotoSheet(property, 'gallery');
+      }
+      if (action === 'gallery-photo') {
+        const property = properties.find(item => item.id === detailPropertyId);
+        const photos = photosByProperty.get(property?.id) || thumbnailAsPhotos(property);
+        const selected = photos.find(item => item.id === actionTarget.dataset.photoId);
+        if (property && selected) {
+          galleryPhotoId = selected.id;
+          editingId = property.id;
+          viewMedia(selected.storagePath, property.address, { gallery: true });
+        }
+      }
+      if (action === 'lightbox-primary') makePhotoPrimary();
+      if (action === 'lightbox-remove') removePropertyPhoto();
+      if (action === 'add-tenant') {
+        tenantEditorOpen = true;
+        detailTab = 'tenant';
+        const property = properties.find(item => item.id === detailPropertyId);
+        if (property) renderDetail(property);
+      }
+      if (action === 'edit-tenant') {
+        tenantEditorOpen = true;
+        const property = properties.find(item => item.id === detailPropertyId);
+        if (property) renderDetail(property);
+      }
+      if (action === 'cancel-tenant') {
+        tenantEditorOpen = false;
+        const property = properties.find(item => item.id === detailPropertyId);
+        if (property) renderDetail(property);
+      }
+      if (action === 'remove-tenant') markPropertyVacant(actionTarget.dataset.id || detailPropertyId);
+      if (action === 'add-lease' || action === 'replace-lease') openFileSheet('lease');
+      if (action === 'add-correspondence') openFileSheet('correspondence');
+      if (action === 'remove-lease') removeLease();
+      if (action === 'view-lease') {
+        const tenant = tenantByProperty.get(detailPropertyId);
+        if (tenant?.leaseStoragePath) {
+          if (isPdf(tenant.leaseContentType, tenant.leaseFileName)) {
+            resolveMediaUrl(tenant.leaseStoragePath).then(url => {
+              if (url) window.open(url, '_blank', 'noopener');
+              else showToast('Could not open that file.');
+            });
+          } else viewMedia(tenant.leaseStoragePath, tenant.leaseFileName);
+        }
+      }
+      if (action === 'view-tenant-file') {
+        const tenant = tenantByProperty.get(detailPropertyId);
+        const file = (tenantFilesByTenant.get(tenant?.id) || []).find(item => item.id === actionTarget.dataset.fileId);
+        if (file) {
+          if (isPdf(file.contentType, file.fileName)) {
+            resolveMediaUrl(file.storagePath).then(url => {
+              if (url) window.open(url, '_blank', 'noopener');
+              else showToast('Could not open that file.');
+            });
+          } else viewMedia(file.storagePath, file.fileName);
+        }
+      }
+      if (action === 'delete-tenant-file') deleteTenantFile(actionTarget.dataset.fileId);
+      if (action === 'delete-appliance') deleteAppliance(actionTarget.dataset.applianceId);
+      if (action === 'photo-sheet') openPhotoSheet(properties.find(item => item.id === actionTarget.dataset.id), 'gallery');
       if (action === 'form-photo') openPhotoSheet(properties.find(item => item.id === editingId) || { id: editingId, thumbnailPath: pendingPhotoPreview || '' }, 'form');
       if (action === 'view-hero') {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
-        if (property?.thumbnailPath) viewMedia(property.thumbnailPath, property.address);
+        const photos = photosByProperty.get(property?.id) || thumbnailAsPhotos(property);
+        const cover = photos.find(item => item.isPrimary) || photos[0];
+        const path = cover?.storagePath || property?.thumbnailPath;
+        if (path) {
+          galleryPhotoId = cover?.id || null;
+          if (property) editingId = property.id;
+          viewMedia(path, property.address, { gallery: Boolean(cover) });
+        }
       }
       if (action === 'export-expenses') {
         const property = properties.find(item => item.id === actionTarget.dataset.id);
@@ -1571,10 +2649,12 @@ function bindUi() {
       }
       if (action === 'add-expense') {
         if (!canWrite()) return;
+        detailTab = 'expenses';
         const property = properties.find(item => item.id === actionTarget.dataset.id);
         if (property) openExpense(property);
       }
       if (action === 'open-expense') {
+        detailTab = 'expenses';
         const property = properties.find(item => item.id === actionTarget.dataset.propertyId);
         const expense = (expensesByProperty.get(actionTarget.dataset.propertyId) || []).find(item => item.id === actionTarget.dataset.expenseId);
         if (property && expense && sampleMode) goSample(`${property.id}/expense/${expense.id}`);
@@ -1582,6 +2662,9 @@ function bindUi() {
       }
       if (action === 'add-receipt' || action === 'replace-receipt') {
         if (!canWrite()) return;
+        filePickerContext = 'receipt';
+        const title = document.querySelector('#receiptSheetTitle');
+        if (title) title.textContent = 'Add receipt';
         receiptSheet.hidden = false;
       }
       if (action === 'remove-receipt') removeCurrentReceipt();
@@ -1592,7 +2675,11 @@ function bindUi() {
       if (action === 'close-invite') invitePanel.hidden = true;
       if (action === 'close-photo-sheet' || action === 'close-receipt-sheet' || action === 'close-export') closeSheets();
       if (action === 'close-confirm') settleConfirm(false);
-      if (action === 'close-lightbox') lightbox.hidden = true;
+      if (action === 'close-lightbox') {
+        lightbox.hidden = true;
+        const actions = document.querySelector('#lightboxActions');
+        if (actions) actions.hidden = true;
+      }
       if (action === 'close-import') {
         if (importMode === 'offer') markLegacyOffered();
         importPanel.hidden = true;
@@ -1602,6 +2689,9 @@ function bindUi() {
     }
     const card = event.target.closest('.property-card');
     if (card) {
+      detailTab = 'property';
+      tenantEditorOpen = false;
+      setDetailDirty(false);
       const property = properties.find(item => item.id === card.dataset.id);
       if (property && sampleMode) goSample(property.id);
       else if (property) renderDetail(property);
@@ -1611,7 +2701,11 @@ function bindUi() {
     if (event.target === invitePanel) invitePanel.hidden = true;
     if (event.target === photoSheet || event.target === receiptSheet || event.target === exportFormatSheet || event.target === exportReadySheet) closeSheets();
     if (event.target === confirmSheet) settleConfirm(false);
-    if (event.target === lightbox) lightbox.hidden = true;
+    if (event.target === lightbox) {
+      lightbox.hidden = true;
+      const actions = document.querySelector('#lightboxActions');
+      if (actions) actions.hidden = true;
+    }
     if (event.target === importPanel) {
       if (importMode === 'offer') markLegacyOffered();
       importPanel.hidden = true;
@@ -1629,11 +2723,20 @@ function resetLocalState() {
   properties = [];
   expensesByProperty = new Map();
   receiptsByExpense = new Map();
+  photosByProperty = new Map();
+  appliancesByProperty = new Map();
+  tenantByProperty = new Map();
+  tenantFilesByTenant = new Map();
   usingSampleFallback = false;
   activeFilter = 'all';
   editingId = null;
   editingExpenseId = null;
   expensePropertyId = null;
+  detailTab = 'property';
+  detailPropertyId = null;
+  tenantEditorOpen = false;
+  detailDirty = false;
+  galleryPhotoId = null;
   searchInput.value = '';
   document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));
   propertyList.innerHTML = '';
@@ -1652,6 +2755,10 @@ startAuth(async ({ status, notice }) => {
     try {
       expensesByProperty = new Map();
       receiptsByExpense = new Map();
+      photosByProperty = new Map();
+      appliancesByProperty = new Map();
+      tenantByProperty = new Map();
+      tenantFilesByTenant = new Map();
       await loadProperties();
       await applySamplePath();
     } catch (error) {

@@ -74,11 +74,35 @@ create table if not exists public.properties (
   rent text not null default '',
   notes text not null default '',
   thumbnail_path text,
+  beds numeric(4, 1),
+  baths numeric(4, 1),
+  sqft integer,
+  year_built integer,
+  property_type text not null default '',
+  description text not null default '',
+  utility_electric text not null default '',
+  utility_gas text not null default '',
+  utility_water text not null default '',
+  utility_notes text not null default '',
+  trash_schedule text not null default '',
+  trash_notes text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.properties add column if not exists thumbnail_path text;
+alter table public.properties add column if not exists beds numeric(4, 1);
+alter table public.properties add column if not exists baths numeric(4, 1);
+alter table public.properties add column if not exists sqft integer;
+alter table public.properties add column if not exists year_built integer;
+alter table public.properties add column if not exists property_type text not null default '';
+alter table public.properties add column if not exists description text not null default '';
+alter table public.properties add column if not exists utility_electric text not null default '';
+alter table public.properties add column if not exists utility_gas text not null default '';
+alter table public.properties add column if not exists utility_water text not null default '';
+alter table public.properties add column if not exists utility_notes text not null default '';
+alter table public.properties add column if not exists trash_schedule text not null default '';
+alter table public.properties add column if not exists trash_notes text not null default '';
 
 create index if not exists properties_account_id_idx on public.properties (account_id);
 create index if not exists properties_account_updated_idx on public.properties (account_id, updated_at desc);
@@ -125,6 +149,81 @@ create table if not exists public.receipts (
 
 create index if not exists receipts_account_id_idx on public.receipts (account_id);
 create index if not exists receipts_expense_id_idx on public.receipts (expense_id);
+
+create table if not exists public.property_appliances (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  name text not null,
+  fuel text check (fuel is null or fuel in ('gas', 'electric', 'other')),
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists property_appliances_property_idx
+  on public.property_appliances (property_id, created_at);
+create index if not exists property_appliances_account_idx
+  on public.property_appliances (account_id);
+
+create table if not exists public.property_photos (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  storage_path text not null,
+  sort_order integer not null default 0,
+  is_primary boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists property_photos_property_idx
+  on public.property_photos (property_id, sort_order, created_at);
+create index if not exists property_photos_account_idx
+  on public.property_photos (account_id);
+create unique index if not exists property_photos_one_primary_idx
+  on public.property_photos (property_id)
+  where is_primary;
+
+create table if not exists public.tenants (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  name text not null default '',
+  phone text not null default '',
+  email text not null default '',
+  notes text not null default '',
+  lease_storage_path text,
+  lease_content_type text not null default '',
+  lease_file_name text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists tenants_one_per_property_idx
+  on public.tenants (property_id);
+create index if not exists tenants_account_idx
+  on public.tenants (account_id);
+
+create table if not exists public.tenant_files (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  property_id uuid not null references public.properties(id) on delete cascade,
+  kind text not null default 'correspondence' check (kind in ('correspondence', 'other')),
+  storage_path text not null,
+  content_type text not null default '',
+  file_name text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists tenant_files_tenant_idx
+  on public.tenant_files (tenant_id, created_at desc);
+create index if not exists tenant_files_account_idx
+  on public.tenant_files (account_id);
+create index if not exists tenant_files_property_idx
+  on public.tenant_files (property_id);
 
 -- ---------------------------------------------------------------------------
 -- Helpers (SECURITY DEFINER so RLS policies do not recurse)
@@ -230,6 +329,76 @@ drop trigger if exists receipts_touch_updated_at on public.receipts;
 create trigger receipts_touch_updated_at
   before update on public.receipts
   for each row execute procedure public.touch_updated_at();
+
+drop trigger if exists property_appliances_touch_updated_at on public.property_appliances;
+create trigger property_appliances_touch_updated_at
+  before update on public.property_appliances
+  for each row execute procedure public.touch_updated_at();
+
+drop trigger if exists property_photos_touch_updated_at on public.property_photos;
+create trigger property_photos_touch_updated_at
+  before update on public.property_photos
+  for each row execute procedure public.touch_updated_at();
+
+drop trigger if exists tenants_touch_updated_at on public.tenants;
+create trigger tenants_touch_updated_at
+  before update on public.tenants
+  for each row execute procedure public.touch_updated_at();
+
+drop trigger if exists tenant_files_touch_updated_at on public.tenant_files;
+create trigger tenant_files_touch_updated_at
+  before update on public.tenant_files
+  for each row execute procedure public.touch_updated_at();
+
+create or replace function public.sync_property_thumbnail()
+returns trigger
+language plpgsql
+as $$
+declare
+  pid uuid;
+  primary_path text;
+  promote_id uuid;
+begin
+  if pg_trigger_depth() > 1 then
+    return coalesce(new, old);
+  end if;
+
+  pid := coalesce(new.property_id, old.property_id);
+
+  if tg_op = 'DELETE' and not exists (
+    select 1 from public.property_photos
+    where property_id = pid and is_primary
+  ) then
+    select id into promote_id
+    from public.property_photos
+    where property_id = pid
+    order by sort_order, created_at
+    limit 1;
+    if promote_id is not null then
+      update public.property_photos
+        set is_primary = true
+      where id = promote_id;
+    end if;
+  end if;
+
+  select storage_path into primary_path
+  from public.property_photos
+  where property_id = pid and is_primary
+  limit 1;
+
+  update public.properties
+    set thumbnail_path = primary_path
+  where id = pid
+    and thumbnail_path is distinct from primary_path;
+
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists property_photos_sync_thumbnail on public.property_photos;
+create trigger property_photos_sync_thumbnail
+  after insert or update or delete on public.property_photos
+  for each row execute procedure public.sync_property_thumbnail();
 
 -- ---------------------------------------------------------------------------
 -- New user: join a matching email invite, or create an owner account
@@ -537,7 +706,10 @@ begin
 
   insert into public.properties (
     id, account_id, address, city, state, zip, status,
-    tenant_name, phone, email, rent, notes, thumbnail_path, created_at, updated_at
+    tenant_name, phone, email, rent, notes, thumbnail_path,
+    beds, baths, sqft, year_built, property_type, description,
+    utility_electric, utility_gas, utility_water, utility_notes,
+    trash_schedule, trash_notes, created_at, updated_at
   )
   select
     case
@@ -557,9 +729,39 @@ begin
     coalesce(trim(item->>'rent'), ''),
     coalesce(trim(item->>'notes'), ''),
     nullif(trim(coalesce(item->>'thumbnail_path', item->>'thumbnailPath', '')), ''),
+    nullif(item->>'beds', '')::numeric,
+    nullif(item->>'baths', '')::numeric,
+    nullif(item->>'sqft', '')::integer,
+    nullif(coalesce(item->>'year_built', item->>'yearBuilt'), '')::integer,
+    coalesce(trim(coalesce(item->>'property_type', item->>'propertyType', '')), ''),
+    coalesce(trim(item->>'description'), ''),
+    coalesce(trim(coalesce(item->>'utility_electric', item->>'utilityElectric', '')), ''),
+    coalesce(trim(coalesce(item->>'utility_gas', item->>'utilityGas', '')), ''),
+    coalesce(trim(coalesce(item->>'utility_water', item->>'utilityWater', '')), ''),
+    coalesce(trim(coalesce(item->>'utility_notes', item->>'utilityNotes', '')), ''),
+    coalesce(trim(coalesce(item->>'trash_schedule', item->>'trashSchedule', '')), ''),
+    coalesce(trim(coalesce(item->>'trash_notes', item->>'trashNotes', '')), ''),
     coalesce((item->>'created_at')::timestamptz, (item->>'createdAt')::timestamptz, now()),
     now()
   from jsonb_array_elements(payload) as item;
+
+  insert into public.tenants (account_id, property_id, name, phone, email)
+  select p.account_id, p.id, p.tenant_name, p.phone, p.email
+  from public.properties p
+  where p.account_id = target_account
+    and (
+      p.status = 'occupied'
+      or nullif(trim(p.tenant_name), '') is not null
+      or nullif(trim(p.phone), '') is not null
+      or nullif(trim(p.email), '') is not null
+    );
+
+  insert into public.property_photos (account_id, property_id, storage_path, sort_order, is_primary)
+  select p.account_id, p.id, p.thumbnail_path, 0, true
+  from public.properties p
+  where p.account_id = target_account
+    and p.thumbnail_path is not null
+    and trim(p.thumbnail_path) <> '';
 end;
 $$;
 
@@ -589,6 +791,10 @@ alter table public.properties enable row level security;
 alter table public.account_invites enable row level security;
 alter table public.expenses enable row level security;
 alter table public.receipts enable row level security;
+alter table public.property_appliances enable row level security;
+alter table public.property_photos enable row level security;
+alter table public.tenants enable row level security;
+alter table public.tenant_files enable row level security;
 
 drop policy if exists accounts_select_member on public.accounts;
 create policy accounts_select_member
@@ -684,6 +890,106 @@ create policy receipts_delete_member
   to authenticated
   using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
 
+drop policy if exists property_appliances_select_member on public.property_appliances;
+create policy property_appliances_select_member
+  on public.property_appliances for select
+  to anon, authenticated
+  using (public.is_account_member(account_id) or public.is_sample_account(account_id));
+
+drop policy if exists property_appliances_insert_member on public.property_appliances;
+create policy property_appliances_insert_member
+  on public.property_appliances for insert
+  to authenticated
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists property_appliances_update_member on public.property_appliances;
+create policy property_appliances_update_member
+  on public.property_appliances for update
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id))
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists property_appliances_delete_member on public.property_appliances;
+create policy property_appliances_delete_member
+  on public.property_appliances for delete
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists property_photos_select_member on public.property_photos;
+create policy property_photos_select_member
+  on public.property_photos for select
+  to anon, authenticated
+  using (public.is_account_member(account_id) or public.is_sample_account(account_id));
+
+drop policy if exists property_photos_insert_member on public.property_photos;
+create policy property_photos_insert_member
+  on public.property_photos for insert
+  to authenticated
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists property_photos_update_member on public.property_photos;
+create policy property_photos_update_member
+  on public.property_photos for update
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id))
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists property_photos_delete_member on public.property_photos;
+create policy property_photos_delete_member
+  on public.property_photos for delete
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenants_select_member on public.tenants;
+create policy tenants_select_member
+  on public.tenants for select
+  to anon, authenticated
+  using (public.is_account_member(account_id) or public.is_sample_account(account_id));
+
+drop policy if exists tenants_insert_member on public.tenants;
+create policy tenants_insert_member
+  on public.tenants for insert
+  to authenticated
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenants_update_member on public.tenants;
+create policy tenants_update_member
+  on public.tenants for update
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id))
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenants_delete_member on public.tenants;
+create policy tenants_delete_member
+  on public.tenants for delete
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenant_files_select_member on public.tenant_files;
+create policy tenant_files_select_member
+  on public.tenant_files for select
+  to anon, authenticated
+  using (public.is_account_member(account_id) or public.is_sample_account(account_id));
+
+drop policy if exists tenant_files_insert_member on public.tenant_files;
+create policy tenant_files_insert_member
+  on public.tenant_files for insert
+  to authenticated
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenant_files_update_member on public.tenant_files;
+create policy tenant_files_update_member
+  on public.tenant_files for update
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id))
+  with check (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
+drop policy if exists tenant_files_delete_member on public.tenant_files;
+create policy tenant_files_delete_member
+  on public.tenant_files for delete
+  to authenticated
+  using (public.is_account_member(account_id) and not public.is_sample_account(account_id));
+
 drop policy if exists invites_select_owner on public.account_invites;
 create policy invites_select_owner
   on public.account_invites for select
@@ -712,6 +1018,14 @@ grant select on public.expenses to anon, authenticated;
 grant insert, update, delete on public.expenses to authenticated;
 grant select on public.receipts to anon, authenticated;
 grant insert, update, delete on public.receipts to authenticated;
+grant select on public.property_appliances to anon, authenticated;
+grant insert, update, delete on public.property_appliances to authenticated;
+grant select on public.property_photos to anon, authenticated;
+grant insert, update, delete on public.property_photos to authenticated;
+grant select on public.tenants to anon, authenticated;
+grant insert, update, delete on public.tenants to authenticated;
+grant select on public.tenant_files to anon, authenticated;
+grant insert, update, delete on public.tenant_files to authenticated;
 grant select, delete on public.account_invites to authenticated;
 
 revoke all on function public.is_account_member(uuid) from public;
@@ -727,6 +1041,7 @@ revoke all on function public.create_invite(uuid, text) from public;
 revoke all on function public.accept_invite(text) from public;
 revoke all on function public.replace_account_properties(uuid, jsonb) from public;
 revoke all on function public.mark_account_seeded(uuid) from public;
+revoke all on function public.sync_property_thumbnail() from public;
 
 grant execute on function public.is_account_member(uuid) to anon, authenticated;
 grant execute on function public.is_account_owner(uuid) to authenticated;
@@ -744,8 +1059,11 @@ grant execute on function public.mark_account_seeded(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Private media bucket + path-scoped policies
--- Thumbnail: {account_id}/properties/{property_id}/thumbnail(+ext)
--- Receipt:   {account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}(+ext)
+-- Thumbnail / primary: {account_id}/properties/{property_id}/thumbnail(+ext)
+-- Gallery:             {account_id}/properties/{property_id}/photos/{photo_id}(+ext)
+-- Receipt:             {account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}(+ext)
+-- Lease:               {account_id}/properties/{property_id}/tenant/lease(+ext)
+-- Correspondence:      {account_id}/properties/{property_id}/tenant/files/{file_id}(+ext)
 -- Sample prefix is read-only for anon + authenticated. Client writes denied.
 -- ---------------------------------------------------------------------------
 
@@ -846,7 +1164,10 @@ on conflict (id) do update
 
 insert into public.properties (
   id, account_id, address, city, state, zip, status,
-  tenant_name, phone, email, rent, notes, thumbnail_path, created_at, updated_at
+  tenant_name, phone, email, rent, notes, thumbnail_path,
+  beds, baths, sqft, year_built, property_type, description,
+  utility_electric, utility_gas, utility_water, utility_notes,
+  trash_schedule, trash_notes, created_at, updated_at
 ) values
   (
     '00000000-0000-4000-8000-000000000011',
@@ -855,6 +1176,11 @@ insert into public.properties (
     'Maria Hernandez', '(916) 555-0148', 'maria.h@example.com', '2450',
     'Renewal conversation in October.',
     '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000011/thumbnail.svg',
+    3, 2, 1620, 1998, 'Single family',
+    'Single-story ranch near Intel. Two-car garage and a covered patio.',
+    'SMUD', 'PG&E', 'City of Folsom',
+    'Landlord pays water. Tenant pays electric and gas.',
+    'Thursday mornings', 'Bins out by 6am. Recycle and green waste weekly.',
     '2026-03-01T16:00:00Z', '2026-09-12T17:00:00Z'
   ),
   (
@@ -864,6 +1190,11 @@ insert into public.properties (
     '', '', '', '2200',
     'Fresh paint completed in the living room.',
     '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000012/thumbnail.svg',
+    2, 2, 1180, 2004, 'Townhouse',
+    'End-unit townhouse. Fresh paint in the living room. Ready to show.',
+    'SMUD', 'PG&E', 'City of Folsom',
+    'All utilities in the landlord name until a tenant moves in.',
+    'Friday mornings', 'HOA handles street sweeping; trash is city pickup.',
     '2026-04-12T16:00:00Z', '2026-08-03T18:00:00Z'
   ),
   (
@@ -873,6 +1204,11 @@ insert into public.properties (
     'James Wilson', '(916) 555-0196', 'james.wilson@example.com', '2750',
     'Two-car garage; gardener included.',
     '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000013/thumbnail.svg',
+    4, 2.5, 2105, 1992, 'Single family',
+    'Two-story with a two-car garage. Gardener included on the first of the month.',
+    'SMUD', 'PG&E', 'City of Folsom',
+    'Tenant pays all utilities.',
+    'Wednesday mornings', 'Extra green-waste pickup in fall.',
     '2026-02-18T16:00:00Z', '2026-09-08T16:30:00Z'
   )
 on conflict (id) do update
@@ -887,6 +1223,18 @@ on conflict (id) do update
       rent = excluded.rent,
       notes = excluded.notes,
       thumbnail_path = excluded.thumbnail_path,
+      beds = excluded.beds,
+      baths = excluded.baths,
+      sqft = excluded.sqft,
+      year_built = excluded.year_built,
+      property_type = excluded.property_type,
+      description = excluded.description,
+      utility_electric = excluded.utility_electric,
+      utility_gas = excluded.utility_gas,
+      utility_water = excluded.utility_water,
+      utility_notes = excluded.utility_notes,
+      trash_schedule = excluded.trash_schedule,
+      trash_notes = excluded.trash_notes,
       updated_at = excluded.updated_at;
 
 insert into public.expenses (
@@ -967,3 +1315,125 @@ on conflict (id) do update
 delete from public.properties
 where id = '00000000-0000-4000-8000-000000000014'
   and account_id = '00000000-0000-4000-8000-000000000001';
+
+insert into public.property_photos (
+  id, account_id, property_id, storage_path, sort_order, is_primary, created_at, updated_at
+) values
+  (
+    '00000000-0000-4000-8000-000000000041',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000011/thumbnail.svg',
+    0, true, '2026-03-01T16:05:00Z', '2026-03-01T16:05:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000042',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000011/photos/00000000-0000-4000-8000-000000000042.svg',
+    1, false, '2026-03-02T16:05:00Z', '2026-03-02T16:05:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000043',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000012',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000012/thumbnail.svg',
+    0, true, '2026-04-12T16:05:00Z', '2026-04-12T16:05:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000044',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000013',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000013/thumbnail.svg',
+    0, true, '2026-02-18T16:05:00Z', '2026-02-18T16:05:00Z'
+  )
+on conflict (id) do update
+  set storage_path = excluded.storage_path,
+      sort_order = excluded.sort_order,
+      is_primary = excluded.is_primary;
+
+insert into public.property_appliances (
+  id, account_id, property_id, name, fuel, notes, created_at, updated_at
+) values
+  (
+    '00000000-0000-4000-8000-000000000071',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    'Range', 'gas', 'Replaced 2023.', '2026-03-01T16:10:00Z', '2026-03-01T16:10:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000072',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    'Dryer', 'electric', 'In the garage.', '2026-03-01T16:11:00Z', '2026-03-01T16:11:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000073',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    'Refrigerator', 'electric', '', '2026-03-01T16:12:00Z', '2026-03-01T16:12:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000074',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000012',
+    'Range', 'electric', 'Works. Leave for the next tenant.', '2026-04-12T16:10:00Z', '2026-04-12T16:10:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000075',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000013',
+    'Washer', 'electric', 'Shared laundry closet.', '2026-02-18T16:10:00Z', '2026-02-18T16:10:00Z'
+  )
+on conflict (id) do update
+  set name = excluded.name, fuel = excluded.fuel, notes = excluded.notes;
+
+insert into public.tenants (
+  id, account_id, property_id, name, phone, email, notes,
+  lease_storage_path, lease_content_type, lease_file_name, created_at, updated_at
+) values
+  (
+    '00000000-0000-4000-8000-000000000061',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000011',
+    'Maria Hernandez', '(916) 555-0148', 'maria.h@example.com',
+    'Renewal conversation in October. Prefers texts.',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000011/tenant/lease.pdf',
+    'application/pdf', 'hernandez-lease.pdf',
+    '2025-10-01T16:00:00Z', '2026-09-12T17:00:00Z'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000063',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000013',
+    'James Wilson', '(916) 555-0196', 'james.wilson@example.com',
+    'Quiet tenant. Gardener comes the first Monday.',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000013/tenant/lease.pdf',
+    'application/pdf', 'wilson-lease.pdf',
+    '2024-08-01T16:00:00Z', '2026-09-08T16:30:00Z'
+  )
+on conflict (id) do update
+  set name = excluded.name, phone = excluded.phone, email = excluded.email,
+      notes = excluded.notes, lease_storage_path = excluded.lease_storage_path,
+      lease_content_type = excluded.lease_content_type, lease_file_name = excluded.lease_file_name;
+
+delete from public.tenants
+where property_id = '00000000-0000-4000-8000-000000000012'
+  and account_id = '00000000-0000-4000-8000-000000000001';
+
+insert into public.tenant_files (
+  id, account_id, tenant_id, property_id, kind, storage_path, content_type, file_name, created_at, updated_at
+) values
+  (
+    '00000000-0000-4000-8000-000000000081',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000061',
+    '00000000-0000-4000-8000-000000000011',
+    'correspondence',
+    '00000000-0000-4000-8000-000000000001/properties/00000000-0000-4000-8000-000000000011/tenant/files/00000000-0000-4000-8000-000000000081.svg',
+    'image/svg+xml', 'renewal-text.svg',
+    '2026-09-10T15:00:00Z', '2026-09-10T15:00:00Z'
+  )
+on conflict (id) do update
+  set storage_path = excluded.storage_path, content_type = excluded.content_type,
+      file_name = excluded.file_name, kind = excluded.kind;
