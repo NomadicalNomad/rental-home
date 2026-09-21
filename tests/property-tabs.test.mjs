@@ -177,11 +177,36 @@ test('gallery primary tile is marked for the list thumbnail', () => {
   assert.match(html, /★/);
 });
 
+test('gallery Add buttons carry the property id', () => {
+  const propertyId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const html = galleryHtml({ photos: [], write: true, sample: false, propertyId });
+  assert.match(html, /data-action="add-gallery-photo"[^>]*data-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"/);
+  assert.equal([...html.matchAll(/data-action="add-gallery-photo"/g)].length, 2);
+});
+
+test('existing-home photo picks persist immediately; new-home form only stages', () => {
+  const appJs = readFileSync(join(root, 'app/app.js'), 'utf8');
+  assert.match(appJs, /function photoTargetProperty/);
+  assert.match(appJs, /function persistPickedPhotos/);
+  assert.match(appJs, /async function stageFormPhoto/);
+  assert.match(appJs, /if \(!property\?\.id && isFormPhotoContext\(\)\)/);
+  assert.match(appJs, /await persistPickedPhotos\(property, \[file\]\)/);
+  assert.match(appJs, /Photo added\. Save this home to keep it\./);
+  assert.match(appJs, /showPhotoFailure/);
+  assert.match(appJs, /Couldn’t add that photo\. Try again\./);
+  assert.match(appJs, /const files = \[\.\.\.\(event\.target\.files \|\| \[\]\)\];\s*event\.target\.value = '';/s);
+});
+
 test('index confirm sheet offers Save / Discard / Cancel for dirty tabs', () => {
   const html = readFileSync(join(root, 'app/index.html'), 'utf8');
+  const appJs = readFileSync(join(root, 'app/app.js'), 'utf8');
   assert.match(html, /id="confirmDiscard"/);
   assert.match(html, /id="lightboxActions"/);
   assert.match(html, /Make primary/);
+  assert.match(html, /<label class="sheet-row js-write" for="photoCameraInput"/);
+  assert.match(html, /<label class="sheet-row js-write" for="photoLibraryInput"/);
+  assert.doesNotMatch(appJs, /#photoCameraInput'\)\.click\(/);
+  assert.doesNotMatch(appJs, /#photoLibraryInput'\)\.click\(/);
   assert.doesNotMatch(html, /id="tenantFields"|name="tenantName"/);
   assert.match(html, /Tenant name, phone, and email live on the Tenant tab/);
 });

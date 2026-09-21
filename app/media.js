@@ -49,6 +49,39 @@ export function isPdf(fileOrType, fileName = '') {
     || /\.pdf$/i.test(name);
 }
 
+const IMAGE_EXT_TYPES = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  avif: 'image/avif',
+  bmp: 'image/bmp',
+  tif: 'image/tiff',
+  tiff: 'image/tiff'
+};
+
+export function imageTypeFromName(name = '') {
+  const match = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match ? (IMAGE_EXT_TYPES[match[1]] || '') : '';
+}
+
+/** Some file pickers leave type empty; account-media allowlist rejects octet-stream. */
+export function normalizeImageFile(file) {
+  if (!file) throw new Error('Please choose a photo.');
+  if (isPdf(file)) throw new Error('Please choose a photo.');
+  const type = String(file.type || '').toLowerCase();
+  if (type.startsWith('image/')) return file;
+  const inferred = imageTypeFromName(file.name);
+  if (!inferred) throw new Error('Please choose a photo.');
+  return new File([file], file.name || 'photo.jpg', {
+    type: inferred,
+    lastModified: file.lastModified || Date.now()
+  });
+}
+
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
@@ -59,19 +92,17 @@ function canvasToBlob(canvas, type, quality) {
 }
 
 export async function compressImageFile(file) {
-  if (!file) throw new Error('Please choose a photo.');
-  if (isPdf(file)) throw new Error('Please choose a photo.');
-  if (!String(file.type || '').startsWith('image/')) throw new Error('Please choose a photo.');
-  if (file.size > MAX_SOURCE_BYTES) throw new Error('Photo too large — try again.');
+  const ready = normalizeImageFile(file);
+  if (ready.size > MAX_SOURCE_BYTES) throw new Error('Photo too large — try again.');
 
   let bitmap = null;
   try {
-    bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(ready);
   } catch (_) {
     bitmap = null;
   }
   if (!bitmap) {
-    if (file.size <= MAX_IMAGE_BYTES && /image\/(jpeg|png|webp)/i.test(file.type)) return file;
+    if (ready.size <= MAX_IMAGE_BYTES && /image\/(jpeg|png|webp)/i.test(ready.type)) return ready;
     throw new Error('Couldn’t add that photo. Try a JPEG or PNG.');
   }
 

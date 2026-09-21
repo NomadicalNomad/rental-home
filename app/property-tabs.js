@@ -106,7 +106,8 @@ function fuelChipsHtml(selected = '') {
   </div>`;
 }
 
-export function galleryHtml({ photos, write, sample }) {
+export function galleryHtml({ photos, write, sample, propertyId = '' }) {
+  const idAttr = propertyId ? ` data-id="${escapeHTML(propertyId)}"` : '';
   const tiles = (photos || []).map(photo => `
     <button class="gallery-tile${photo.isPrimary ? ' is-primary' : ''}" type="button" data-action="gallery-photo" data-photo-id="${escapeHTML(photo.id)}" aria-label="${photo.isPrimary ? 'Primary photo' : 'Property photo'}">
       <div class="gallery-thumb" data-thumb-path="${escapeHTML(photo.storagePath)}" data-thumb-id="${escapeHTML(photo.id)}" data-thumb-alt="${photo.isPrimary ? 'Primary photo' : 'Property photo'}">
@@ -116,7 +117,7 @@ export function galleryHtml({ photos, write, sample }) {
     </button>`).join('');
   const atCap = (photos || []).length >= GALLERY_SOFT_CAP;
   const add = write && !atCap
-    ? `<button class="gallery-tile is-add js-write" type="button" data-action="add-gallery-photo"><span aria-hidden="true">＋</span> Add</button>`
+    ? `<button class="gallery-tile is-add js-write" type="button" data-action="add-gallery-photo"${idAttr}><span aria-hidden="true">＋</span> Add</button>`
     : '';
   if (!photos?.length && !write) {
     return `<div class="info-card"><h3>Photos</h3><p class="muted">${sample ? 'No extra photos.' : 'No photos yet.'}</p></div>`;
@@ -124,7 +125,7 @@ export function galleryHtml({ photos, write, sample }) {
   return `<div class="info-card">
     <div class="card-head">
       <h3>Photos</h3>
-      ${write && !atCap ? '<button class="text-button js-write" type="button" data-action="add-gallery-photo">+ Add</button>' : ''}
+      ${write && !atCap ? `<button class="text-button js-write" type="button" data-action="add-gallery-photo"${idAttr}>+ Add</button>` : ''}
     </div>
     <p class="muted">Primary photo shows on your list.</p>
     <div class="gallery-row">${tiles}${add}</div>
@@ -306,7 +307,7 @@ export function propertyTabHtml({ property, photos, appliances, expenses, tenant
     <div class="detail-grid">
       ${fields}
       ${appliancesHtml({ appliances, write })}
-      ${galleryHtml({ photos, write, sample })}
+      ${galleryHtml({ photos, write, sample, propertyId: property.id })}
       ${tenantChip || expenseChip ? `<div class="deep-link-row">${tenantChip}${expenseChip}</div>` : ''}
       ${write ? `<div class="danger-zone js-write"><button class="danger-link" type="button" data-action="delete-property" data-id="${escapeHTML(property.id)}">Delete property</button></div>` : ''}
     </div>`;
