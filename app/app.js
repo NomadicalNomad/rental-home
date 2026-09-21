@@ -2084,6 +2084,7 @@ function openFileSheet(kind) {
 }
 
 async function applyPickedTenantFile(file) {
+  const kind = filePickerContext;
   closeSheets();
   const property = properties.find(item => item.id === detailPropertyId);
   if (!property) return;
@@ -2096,7 +2097,7 @@ async function applyPickedTenantFile(file) {
   const ext = extensionForType(ready.type, isPdf(ready) ? 'pdf' : 'jpg');
   const supabase = getSupabase();
   try {
-    if (filePickerContext === 'lease') {
+    if (kind === 'lease') {
       const path = leaseObjectPath(activeAccountId(), property.id, ext);
       await uploadAccountMedia(path, ready);
       if (tenant.leaseStoragePath && tenant.leaseStoragePath !== path) {
