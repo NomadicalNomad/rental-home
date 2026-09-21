@@ -2539,12 +2539,12 @@ function bindUi() {
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    applyPickedPhoto(file).catch(error => showPhotoFailure(error));
+    if (file) applyPickedPhoto(file).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#photoLibraryInput')?.addEventListener('change', event => {
     const files = event.target.files;
     event.target.value = '';
-    applyPickedPhotos(files).catch(error => showPhotoFailure(error));
+    if (files?.length) applyPickedPhotos(files).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#receiptCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
