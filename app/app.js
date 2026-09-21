@@ -1375,17 +1375,20 @@ async function deleteProperty(propertyId = editingId) {
 
 function openPhotoSheet(property, context = 'detail', photoId = null) {
   if (!property) {
+    closeSheets();
     showToast('Couldn’t add that photo. Try again.');
     return;
   }
   const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
   const selected = photoId ? photos.find(item => item.id === photoId) : null;
   if (sampleMode) {
+    closeSheets();
     const path = selected?.storagePath || property.thumbnailPath;
     if (path) viewMedia(path, property.address);
     return;
   }
   if (!canWrite() && !selected) {
+    closeSheets();
     showToast(sampleWriteError().message);
     return;
   }
@@ -1588,6 +1591,7 @@ async function persistPickedPhotos(property, files) {
 }
 
 async function applyPickedPhoto(file) {
+  closeSheets();
   if (!file) {
     showPhotoFailure(new Error('Please choose a photo.'));
     return;
@@ -1597,7 +1601,6 @@ async function applyPickedPhoto(file) {
     return;
   }
   const property = photoTargetProperty();
-  closeSheets();
   if (!property?.id && isFormPhotoContext()) {
     try {
       await stageFormPhoto(file);
@@ -1619,6 +1622,7 @@ async function applyPickedPhoto(file) {
 
 async function applyPickedPhotos(fileList) {
   const files = [...(fileList || [])].filter(Boolean);
+  closeSheets();
   if (!files.length) {
     showPhotoFailure(new Error('Please choose a photo.'));
     return;
@@ -1643,7 +1647,6 @@ async function applyPickedPhotos(fileList) {
   }
   const accepted = files.slice(0, room);
   if (accepted.length < files.length) showToast('You can add up to 10 photos.');
-  closeSheets();
   try {
     await persistPickedPhotos(property, accepted);
   } catch (error) {
@@ -2566,8 +2569,13 @@ function bindUi() {
     const photoChoice = event.target.closest('[data-photo]');
     if (photoChoice) {
       const choice = photoChoice.dataset.photo;
-      if (choice === 'camera') document.querySelector('#photoCameraInput').click();
-      if (choice === 'library') document.querySelector('#photoLibraryInput').click();
+      if (choice === 'camera' || choice === 'library') {
+        // Native <label for> opens the picker. Hide the sheet after that
+        // default action queues; hiding the label's ancestor synchronously
+        // can cancel the OS file dialog.
+        setTimeout(() => closeSheets(), 0);
+        return;
+      }
       if (choice === 'remove') removePropertyPhoto();
       if (choice === 'view') viewSelectedGalleryPhoto();
       if (choice === 'primary') makePhotoPrimary();
@@ -2639,7 +2647,10 @@ function bindUi() {
       if (action === 'add-gallery-photo') {
         const property = properties.find(item => item.id === (actionTarget.dataset.id || detailPropertyId || editingId));
         if (property) openPhotoSheet(property, 'gallery');
-        else showToast('Couldn’t add that photo. Try again.');
+        else {
+          closeSheets();
+          showToast('Couldn’t add that photo. Try again.');
+        }
       }
       if (action === 'gallery-photo') {
         const property = properties.find(item => item.id === detailPropertyId);

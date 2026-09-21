@@ -33,8 +33,8 @@ test('normalizeImageFile fills empty picker MIME from the filename', () => {
   assert.throws(() => normalizeImageFile(new File([new Uint8Array([1])], 'notes', { type: '' })), /Please choose a photo/);
 });
 
-test('service worker cache name bumped past v20', () => {
+test('service worker cache name bumped past v21', () => {
   const sw = readFileSync(join(root, 'app/sw.js'), 'utf8');
-  assert.match(sw, /rentmanor-shell-v21/);
-  assert.doesNotMatch(sw, /rentmanor-shell-v20/);
+  assert.match(sw, /rentmanor-shell-v22/);
+  assert.doesNotMatch(sw, /rentmanor-shell-v21/);
 });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentmanor-shell-v21';
+const CACHE_NAME = 'rentmanor-shell-v22';
 const APP_SHELL = [
   './',
   './index.html',

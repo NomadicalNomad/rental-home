@@ -198,9 +198,14 @@ test('existing-home photo picks persist immediately; new-home form only stages',
 
 test('index confirm sheet offers Save / Discard / Cancel for dirty tabs', () => {
   const html = readFileSync(join(root, 'app/index.html'), 'utf8');
+  const appJs = readFileSync(join(root, 'app/app.js'), 'utf8');
   assert.match(html, /id="confirmDiscard"/);
   assert.match(html, /id="lightboxActions"/);
   assert.match(html, /Make primary/);
+  assert.match(html, /<label class="sheet-row js-write" for="photoCameraInput"/);
+  assert.match(html, /<label class="sheet-row js-write" for="photoLibraryInput"/);
+  assert.doesNotMatch(appJs, /#photoCameraInput'\)\.click\(/);
+  assert.doesNotMatch(appJs, /#photoLibraryInput'\)\.click\(/);
   assert.doesNotMatch(html, /id="tenantFields"|name="tenantName"/);
   assert.match(html, /Tenant name, phone, and email live on the Tenant tab/);
 });
