@@ -194,6 +194,7 @@ test('existing-home photo picks persist immediately; new-home form only stages',
   assert.match(appJs, /Photo added\. Save this home to keep it\./);
   assert.match(appJs, /showPhotoFailure/);
   assert.match(appJs, /Couldn’t add that photo\. Try again\./);
+  assert.match(appJs, /const files = \[\.\.\.\(event\.target\.files \|\| \[\]\)\];\s*event\.target\.value = '';/s);
 });
 
 test('index confirm sheet offers Save / Discard / Cancel for dirty tabs', () => {

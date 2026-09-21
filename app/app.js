@@ -2540,14 +2540,15 @@ function bindUi() {
   document.querySelector('#confirmYes')?.addEventListener('click', () => settleConfirm(true));
   document.querySelector('#confirmDiscard')?.addEventListener('click', () => settleConfirm('discard'));
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
-    const file = event.target.files?.[0];
+    const files = [...(event.target.files || [])];
     event.target.value = '';
+    const file = files[0];
     if (file) applyPickedPhoto(file).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#photoLibraryInput')?.addEventListener('change', event => {
-    const files = event.target.files;
+    const files = [...(event.target.files || [])];
     event.target.value = '';
-    if (files?.length) applyPickedPhotos(files).catch(error => showPhotoFailure(error));
+    if (files.length) applyPickedPhotos(files).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#receiptCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
