@@ -1258,6 +1258,8 @@ function galleryPhotoCount(propertyId) {
 }
 
 async function addGalleryPhoto(property, file) {
+  if (!property?.id) throw new Error('Couldn’t add that photo. Try again.');
+  if (!file) throw new Error('Please choose a photo.');
   const existingCount = galleryPhotoCount(property.id);
   if (existingCount >= GALLERY_SOFT_CAP) {
     showToast('You can add up to 10 photos.');
@@ -1372,7 +1374,10 @@ async function deleteProperty(propertyId = editingId) {
 }
 
 function openPhotoSheet(property, context = 'detail', photoId = null) {
-  if (!property) return;
+  if (!property) {
+    showToast('Couldn’t add that photo. Try again.');
+    return;
+  }
   const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
   const selected = photoId ? photos.find(item => item.id === photoId) : null;
   if (sampleMode) {
@@ -1380,7 +1385,10 @@ function openPhotoSheet(property, context = 'detail', photoId = null) {
     if (path) viewMedia(path, property.address);
     return;
   }
-  if (!canWrite() && !selected) return;
+  if (!canWrite() && !selected) {
+    showToast(sampleWriteError().message);
+    return;
+  }
   photoContext = context;
   galleryPhotoId = selected?.id || null;
   editingId = property.id;
@@ -1513,61 +1521,47 @@ async function generateExpenseExport(format) {
   }
 }
 
-async function applyPickedPhoto(file) {
-  if (!file || !canWrite()) return;
-  const property = properties.find(item => item.id === editingId);
-  closeSheets();
-  if (photoContext === 'form' || currentView === 'form') {
-    try {
-      const compressed = await compressImageFile(file);
-      pendingPhotoFile = compressed;
-      revokeObjectUrl(pendingPhotoPreview);
-      pendingPhotoPreview = URL.createObjectURL(compressed);
-      if (formPhotoError) formPhotoError.hidden = true;
-      renderFormPhoto(property);
-    } catch (error) {
-      if (formPhotoError) {
-        formPhotoError.hidden = false;
-        formPhotoError.textContent = friendlyError(error);
-      } else showToast(friendlyError(error));
-    }
-    return;
-  }
-  if (!property) return;
-  const bar = detailView.querySelector('.upload-bar');
-  if (bar) bar.hidden = false;
-  uploadBusy = true;
-  try {
-    await addGalleryPhoto(property, file);
-    await loadProperties();
-    showToast('Photo saved.');
-    renderDetail(properties.find(item => item.id === property.id) || property);
-  } catch (error) {
-    showToast(friendlyError(error));
-  } finally {
-    uploadBusy = false;
-    if (bar) bar.hidden = true;
-  }
+function isFormPhotoContext() {
+  return photoContext === 'form' || currentView === 'form';
 }
 
-async function applyPickedPhotos(fileList) {
-  const files = [...(fileList || [])].filter(Boolean);
-  if (!files.length) return;
-  if (photoContext === 'form' || currentView === 'form') {
-    await applyPickedPhoto(files[0]);
-    return;
+function photoTargetProperty() {
+  if (editingId) return properties.find(item => item.id === editingId) || { id: editingId };
+  if (isFormPhotoContext()) return null;
+  if (detailPropertyId) return properties.find(item => item.id === detailPropertyId) || { id: detailPropertyId };
+  return null;
+}
+
+function showPhotoFailure(error) {
+  const message = friendlyError(error);
+  if (isFormPhotoContext() && formPhotoError) {
+    formPhotoError.hidden = false;
+    formPhotoError.textContent = message;
   }
-  const property = properties.find(item => item.id === editingId);
-  if (!property || !canWrite()) return;
+  showToast(message);
+}
+
+async function stageFormPhoto(file) {
+  const compressed = await compressImageFile(file);
+  pendingPhotoFile = compressed;
+  revokeObjectUrl(pendingPhotoPreview);
+  pendingPhotoPreview = URL.createObjectURL(compressed);
+  if (formPhotoError) formPhotoError.hidden = true;
+  renderFormPhoto(photoTargetProperty());
+  showToast('Photo added. Save this home to keep it.');
+}
+
+async function persistPickedPhotos(property, files) {
+  const list = [...(files || [])].filter(Boolean);
+  if (!list.length) throw new Error('Please choose a photo.');
   const room = GALLERY_SOFT_CAP - galleryPhotoCount(property.id);
   if (room <= 0) {
     showToast('You can add up to 10 photos.');
-    return;
+    return property;
   }
-  const accepted = files.slice(0, room);
-  if (accepted.length < files.length) showToast('You can add up to 10 photos.');
-  closeSheets();
-  const bar = detailView.querySelector('.upload-bar');
+  const accepted = list.slice(0, room);
+  if (accepted.length < list.length) showToast('You can add up to 10 photos.');
+  const bar = currentView === 'detail' ? detailView.querySelector('.upload-bar') : null;
   if (bar) bar.hidden = false;
   uploadBusy = true;
   try {
@@ -1576,12 +1570,84 @@ async function applyPickedPhotos(fileList) {
     }
     await loadProperties();
     showToast(accepted.length > 1 ? 'Photos saved.' : 'Photo saved.');
-    renderDetail(properties.find(item => item.id === property.id) || property);
-  } catch (error) {
-    showToast(friendlyError(error));
+    const next = properties.find(item => item.id === property.id) || property;
+    if (isFormPhotoContext()) {
+      pendingPhotoFile = null;
+      revokeObjectUrl(pendingPhotoPreview);
+      pendingPhotoPreview = '';
+      if (formPhotoError) formPhotoError.hidden = true;
+      renderFormPhoto(next);
+    } else {
+      renderDetail(next);
+    }
+    return next;
   } finally {
     uploadBusy = false;
     if (bar) bar.hidden = true;
+  }
+}
+
+async function applyPickedPhoto(file) {
+  if (!file) {
+    showPhotoFailure(new Error('Please choose a photo.'));
+    return;
+  }
+  if (!canWrite()) {
+    showPhotoFailure(sampleWriteError());
+    return;
+  }
+  const property = photoTargetProperty();
+  closeSheets();
+  if (!property?.id && isFormPhotoContext()) {
+    try {
+      await stageFormPhoto(file);
+    } catch (error) {
+      showPhotoFailure(error);
+    }
+    return;
+  }
+  if (!property?.id) {
+    showPhotoFailure(new Error('Couldn’t add that photo. Try again.'));
+    return;
+  }
+  try {
+    await persistPickedPhotos(property, [file]);
+  } catch (error) {
+    showPhotoFailure(error);
+  }
+}
+
+async function applyPickedPhotos(fileList) {
+  const files = [...(fileList || [])].filter(Boolean);
+  if (!files.length) {
+    showPhotoFailure(new Error('Please choose a photo.'));
+    return;
+  }
+  if (!canWrite()) {
+    showPhotoFailure(sampleWriteError());
+    return;
+  }
+  if (isFormPhotoContext() && !photoTargetProperty()?.id) {
+    await applyPickedPhoto(files[0]);
+    return;
+  }
+  const property = photoTargetProperty();
+  if (!property?.id) {
+    showPhotoFailure(new Error('Couldn’t add that photo. Try again.'));
+    return;
+  }
+  const room = GALLERY_SOFT_CAP - galleryPhotoCount(property.id);
+  if (room <= 0) {
+    showToast('You can add up to 10 photos.');
+    return;
+  }
+  const accepted = files.slice(0, room);
+  if (accepted.length < files.length) showToast('You can add up to 10 photos.');
+  closeSheets();
+  try {
+    await persistPickedPhotos(property, accepted);
+  } catch (error) {
+    showPhotoFailure(error);
   }
 }
 
@@ -2473,12 +2539,12 @@ function bindUi() {
   document.querySelector('#photoCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (file) applyPickedPhoto(file);
+    applyPickedPhoto(file).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#photoLibraryInput')?.addEventListener('change', event => {
     const files = event.target.files;
     event.target.value = '';
-    if (files?.length) applyPickedPhotos(files);
+    applyPickedPhotos(files).catch(error => showPhotoFailure(error));
   });
   document.querySelector('#receiptCameraInput')?.addEventListener('change', event => {
     const file = event.target.files?.[0];
@@ -2571,8 +2637,9 @@ function bindUi() {
       }
       if (action === 'delete-property') deleteProperty(actionTarget.dataset.id || detailPropertyId);
       if (action === 'add-gallery-photo') {
-        const property = properties.find(item => item.id === (actionTarget.dataset.id || detailPropertyId));
+        const property = properties.find(item => item.id === (actionTarget.dataset.id || detailPropertyId || editingId));
         if (property) openPhotoSheet(property, 'gallery');
+        else showToast('Couldn’t add that photo. Try again.');
       }
       if (action === 'gallery-photo') {
         const property = properties.find(item => item.id === detailPropertyId);
