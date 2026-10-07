@@ -169,7 +169,7 @@ test('sticky address chrome and 3-segment tabs use selected fill, not underline-
 
 test('gallery primary tile is marked for the list thumbnail', () => {
   const html = galleryHtml({
-    photos: samplePhotos().filter(item => item.propertyId === '10000000-0000-4000-8000-000000000001'),
+    photos: samplePhotos().filter(item => item.propertyId === '00000000-0000-4000-8000-000000000011'),
     write: false,
     sample: true
   });

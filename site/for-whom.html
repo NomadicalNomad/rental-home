@@ -22,7 +22,7 @@
         <a href="features.html">How it works</a>
         <a href="for-whom.html" aria-current="page">Who it’s for</a>
         <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -48,7 +48,7 @@
       </ul>
 
       <div class="cta-row">
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
       </div>
     </div>
   </main>
@@ -72,7 +72,7 @@
     (function () {
       if (!/\.github\.io$/i.test(location.hostname)) return;
       var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href + (a.textContent.trim()==='Create account' ? '?mode=signup' : ''); });
     })();
   </script>
 </body>

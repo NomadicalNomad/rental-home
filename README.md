@@ -1,162 +1,58 @@
 # RentManor
 
-RentManor is a simple iPhone Home Screen app for managing rentals — for you and the people you trust. Each account’s properties stay private. Invite a partner or helper to the same account when you want to share.
+RentManor is a static browser/Home Screen app for small rental portfolios: properties, facts/utilities/trash, galleries, appliances, one current tenant, lease/correspondence copies, expenses and receipts. The repository slug remains rental-home. Your properties. Your people.
 
-The GitHub repo slug stays `rental-home`. The user-facing name is **RentManor**.
+This remediation is prepared on codex/rentmanor-complete-remediation. It has NOT been deployed or applied to production. See docs/RENTMANOR_COMPLETE_REMEDIATION_SUMMARY.md for exact tests and blockers and docs/RELEASE_RECOVERY_RUNBOOK.md for upgrade, release and rollback procedures.
 
-**Tagline:** Your properties. Your people.
+## Use and share
 
-## Live URLs
+Open https://app.rentmanor.com/; Create account opens signup. Complete email confirmation if required by the provider. New accounts start empty. Each person uses an individual sign-in. Owners create, inspect and revoke invitation links; optionally restrict them to an email. New links are cryptographically random, expire after 14 days and are consumed once by a confirmed identity. Legacy short links require manual reissue after the migration. No invitation emails are automatically sent.
 
-After DNS (Damon / GoDaddy — see [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md)):
+Owners and trusted members can view, edit, delete and completely replace their shared account's records. Only owners administer invitations. Account selection lists actual memberships and remembers the selection for that user. Never share passwords or invite a person who should not have these destructive permissions.
 
-- Marketing: https://rentmanor.com/ (`www` → apex)
-- App (Sign in / Create account): https://app.rentmanor.com/
+Open https://app.rentmanor.com/#/sample for three read-only sample homes. They are never copied into private accounts. The local sample also works without configuration or the SDK CDN. Private edits require a connection; the cached shell is not an offline private database.
 
-Until DNS is live, GitHub Pages still works:
+For iPhone Home Screen installation, open **app.rentmanor.com** in Safari, tap Share, Add to Home Screen, Add. Physical iPhone camera/install/sharing behavior still needs device verification; automated mobile-width Chromium/WebKit tests are not a physical iPhone test.
 
-- Marketing: https://nomadicalnomad.github.io/rental-home/ → `site/`
-- App: https://nomadicalnomad.github.io/rental-home/app/
+## Files and recovery
 
-## Create an account
+Each property supports up to ten gallery photos, one primary cover, appliance notes, one current tenant, one lease and saved correspondence copies. Each expense has at most one receipt. Uploads use unique paths; replacements commit metadata before retiring original bytes. Failed cleanup retains unreferenced files for scoped operator review. Database constraints enforce account/parent integrity and the gallery/receipt limits.
 
-1. Open the app in Safari (or a desktop browser): https://app.rentmanor.com/ (or the github.io `/app/` URL above).
-2. Tap **Create an account**.
-3. Enter an email and a password (at least 6 characters).
-4. You land on **Your properties**. A new account starts empty — add your first rental when you are ready.
+Photos are compressed to JPEG (up to 450 KiB); source images are limited to 15 MiB. PDFs are limited to 8 MiB in normal upload forms. Private Storage limits objects to 10 MiB and supported JPEG/PNG/WebP/GIF/PDF formats. File signatures are checked in the client; hosted Storage MIME validation is not arbitrary-content antivirus/decoder validation. Convert unsupported HEIC/HEIF to JPEG if the browser cannot decode it.
 
-It is okay if Mom and a helper both use the **same email and password**. That is the simplest way to share.
+Account → Backup & restore downloads a version-2 **complete recovery archive**, containing canonical records from all seven content tables and every referenced private file with counts/SHA-256 checksums. Missing files, inconsistent snapshots and unsupported media prevent a complete export. Archives contain sensitive tenant/property information, are not encrypted by the app, and must be privately stored.
 
-To see how the app looks with example homes, tap **View sample** (or open `/#/sample`). The sample is read only. It is not copied into your account. Use **Back to my account** to return.
+Complete replacement previews the archive, downloads a verified recovery point of the current account, requires REPLACE, stages/verifies incoming files, and commits rows transactionally. Original files remain for operator rollback. Browser limits: 5,000 homes, 50,000 rows per table, 70 MiB binary data, 100 MiB JSON. Larger portfolios require operator export. No automatic backup service is configured.
 
-## Invite / share
+Version-1/object/array property files and older device lists are limited non-destructive imports. They preserve existing children/records, deduplicate provenance fingerprints, preview conflicts and do not recreate omitted attachments. Older device source records are retained.
 
-Two ways to let a second person see the same portfolio:
+Expense CSV/PDF reports contain the selected property's expenses, not receipt binaries. CSV neutralizes formula-leading text with an apostrophe. PDF embeds Noto Sans, wraps long text and paginates; unsupported scripts/emoji produce an actionable CSV alternative.
 
-1. **Shared sign-in** — give them the same email and password.
-2. **Invite** — the owner taps **Account → Invite someone**. Optionally type their email, then **Create invite link**. Send the link or the short code. They create their own sign-in (or sign in) and then see the same homes.
+## Setup and tests
 
-Invites work for 14 days. They join as a member of *this* account; they do not get a copy of someone else’s properties.
+Use Node 22 or newer:
 
-## Add to Home Screen (iPhone)
+    npm ci
+    npm test
+    npx playwright install chromium webkit
+    npm run test:browser
+    node scripts/build-static.mjs
 
-1. Open rentmanor.com in Safari (not Chrome).
-2. Tap the Share button.
-3. Tap Add to Home Screen.
-4. Tap Add.
+The browser test harness serves null backend configuration and blocks all remote requests. PostgreSQL tests use disposable PGlite with synthetic Auth/Storage tables. These are meaningful SQL tests, not full Supabase provider integration or independent-session concurrency proof. The runbook lists required isolated Supabase release tests.
 
-Until DNS is live, the same steps work from the GitHub Pages URLs (Safari, not Chrome):
+For local development, serve the repository with a static server, for example python -m http.server 8000, then open http://localhost:8000/app/#/sample. For private local tests, back up your public config, copy app/config.example.js to app/config.js and explicitly configure a DISPOSABLE project with environment='local' and localhost in allowedHosts. The committed production configuration is rejected on localhost. Do not use production as a test environment. Restore intended deployment configuration before packaging.
 
-- Marketing: https://nomadicalnomad.github.io/rental-home/
-- App icon / sign-in: https://nomadicalnomad.github.io/rental-home/app/
+app/config.js is the only configuration source. index.html has no inline backend configuration; .env.example is not consumed by the static browser. The Supabase anon key is public and protected by server RLS; never place a service-role key or access token in browser files.
 
-On a computer, bookmark the site. Home Screen install is for iPhone Safari.
+New database installations apply supabase/schema.sql. Tabs-enabled existing installations apply the new complete-remediation migration only after compatibility checks and verified record/media backups. Pre-tabs installations use the documented forward bridge; historical tabs migration has a reproduced seed/backfill collision. **Read docs/RELEASE_RECOVERY_RUNBOOK.md before any upgrade.** Do not rewrite/delete conflicting production data automatically.
 
-## Backup & restore
+## Release and operations
 
-- **Account → Backup & restore** downloads a JSON file of the signed-in account.
-- Restoring a JSON file **replaces properties in the signed-in account only**.
-- After sign-in, if this phone still has the old on-device list, the app offers a **one-time import** into the account.
-- JSON backups cover properties. Photos and receipts stay in private Storage; a full media zip is out of scope for v1.
+Netlify uses netlify.toml, builds through scripts/build-static.mjs and publishes dist (curated app/site files only). GitHub Pages main/root remains the historical fallback. Branch publication is separate from merging/deployment. Frontend and database upgrades must be coordinated. No production migration, deployment, DNS change or test email was performed here.
 
-New accounts start with **zero** properties. Folsom sample homes appear only in shared sample mode at `/#/sample` (logical account `00000000-0000-4000-8000-000000000001`). They are never copied into a personal account.
+    node scripts/verify-backup.mjs <private-archive.json>
+    node scripts/health-check.mjs https://app.rentmanor.com/
 
-## Sample portfolio
+These checks are manual mechanisms, not configured monitoring or scheduled backups. Operator identity/contact, support intake, retention and account deletion policy need owner approval. Privacy and terms are explicitly marked drafts. The runbook supplies scoped deletion/recovery procedures; the app has no self-service account deletion or published support address.
 
-Anyone can open the shared demo without signing in:
-
-- App: https://app.rentmanor.com/#/sample
-- GitHub Pages: https://nomadicalnomad.github.io/rental-home/app/#/sample
-
-A sticky **SAMPLE · Read only** banner stays on list, detail, and expense. Writes are hidden. Exit with **Back to my account** (signed in) or **Sign in** / **Create account**. There is no “load sample into my account” button. The demo homes also ship as local files so `#/sample` works before sample SQL is applied.
-
-## Photos, expenses, receipts
-
-On a property you own:
-
-- Add, replace, or remove one primary photo (camera or library). It shows on the list and the detail screen.
-- Track expenses (date, amount, category, notes) with an all-time total.
-- Export that property’s expenses as CSV or PDF, then **Share…** or **Save file**. Receipt files are not included.
-- Attach one receipt per expense — camera, photo library, or PDF — then view or remove it.
-
-Photos and receipts live in the private `account-media` bucket:
-
-- Thumbnail: `{account_id}/properties/{property_id}/thumbnail` (+ extension)
-- Receipt: `{account_id}/properties/{property_id}/expenses/{expense_id}/{receipt_id}` (+ extension)
-
-## Ops — photos/expenses SQL
-
-**Production has this applied** (`properties.thumbnail_path`, `expenses`, `receipts`, private `account-media`). Personal Add home is no longer blocked by a missing column.
-
-Keep `supabase/migrations/20260919_photos_expenses_sample.sql` for any environment that still runs an older schema (safe to re-run; does not wipe personal accounts or auto-seed Folsom into them). New projects can paste the current `supabase/schema.sql` instead.
-
-If a later schema miss happens, the app shows “This app update needs a database update — contact support” or the real PostgREST `message` / `code` / `details` — never only “Something went wrong.”
-
-## How to configure (Damon)
-
-This app talks to **Supabase** (email/password auth + Postgres + row-level security). There are no demo logins in the repo.
-
-1. Create a free project at [supabase.com](https://supabase.com).
-2. **SQL editor:** paste and run `supabase/schema.sql` (full setup). If this project already ran an older schema, run `supabase/migrations/20260919_photos_expenses_sample.sql` instead. Either file adds photos/expenses tables and does **not** wipe personal accounts or auto-seed Folsom into them.
-3. **Storage:** confirm a **private** bucket named `account-media` exists (the SQL tries to create it). If the insert was skipped:
-   1. Dashboard → **Storage → New bucket**
-   2. Name: `account-media`
-   3. Public: **off**
-   4. Re-run the SQL so the path policies attach
-4. **Optional sample media:** upload files from `supabase/sample-media/` into `account-media` using the `storage_path` values in the migration. The app also ships the same files as a sample-only fallback.
-5. **Authentication → Providers → Email:** enable Email. For simplest sign-up, turn **Confirm email** off (otherwise she must click a mail link).
-6. **Authentication → URL configuration:**
-   - Site URL: `https://app.rentmanor.com`
-   - Redirect URLs: that origin, `https://nomadicalnomad.github.io/rental-home/app/**`, and `http://localhost:8000/**`
-7. **Settings → API:** copy **Project URL** and the **anon public** key. Never copy `service_role`.
-8. `cp app/config.example.js app/config.js` and paste those two values. Same names are listed in `.env.example`.
-9. GitHub Pages only serves committed files. Because the anon key is public (RLS is what protects data), add `app/config.js` with:
-
-   ```bash
-   git add -f app/config.js
-   git commit -m "Add public Supabase anon config for Pages"
-   git push
-   ```
-
-10. Reload the app URL. You should see **Sign in / Create account**, not “This copy isn’t connected yet”. Then open `/#/sample` to confirm the shared portfolio loads.
-
-`.gitignore` ignores `.env`, `config.js`, and `config.local.js`. Do not commit `service_role`.
-
-Production `app/index.html` also inlines the same public `window.RENTAL_HOME_CONFIG` values so a missing or service-worker-blocked `config.js` cannot wall visitors. `app/config.js` still loads afterward and can override.
-
-## Files
-
-- `site/` — marketing pages for rentmanor.com (home, how it works, who it’s for, privacy, terms)
-- `app/` — PWA for app.rentmanor.com (`index.html`, `styles.css`, `app.js`, `auth.js`, `errors.js`, `property-row.js`, `media.js`, `export.js`, `manifest.json`, `sw.js`, `icons/`, `sample-media/`, `config.js`)
-- `app/config.example.js`, `.env.example` — how to point the PWA at Supabase
-- `supabase/schema.sql` — tables, RLS, invite functions, sample seed, storage policies
-- `supabase/migrations/20260919_photos_expenses_sample.sql` — incremental SQL if the older schema is already applied
-- `supabase/sample-media/` — optional upload set for the shared sample bucket prefix
-- `netlify.toml` — host-based routing (`site/` on apex, `app/` on `app.`)
-- `docs/DNS-GODADDY.md` — exact GoDaddy records Damon must add
-- `rental-home.code-workspace` — VS Code / Cursor workspace
-
-## Run locally
-
-```bash
-cd rental-home
-cp app/config.example.js app/config.js   # then paste your URL + anon key
-python3 -m http.server 8000
-```
-
-Open:
-
-- http://localhost:8000/site/ — marketing
-- http://localhost:8000/app/ — app (a static server is needed for the service worker; it won’t register from `file://`)
-- http://localhost:8000/app/#/sample — shared read-only sample
-
-Without `config.js` *and* without the inline production values, the app shows a clear setup message and does not invent credentials.
-
-## Deploy
-
-- **GitHub Pages (fallback):** branch `main` / root. `/` redirects to `site/`. App is at `/app/`.
-- **Netlify (preferred for rentmanor.com):** publish directory = repo root, empty build command. `netlify.toml` rewrites apex → `site/` and `app.rentmanor.com` → `app/`. Then follow [`docs/DNS-GODADDY.md`](docs/DNS-GODADDY.md).
-
-## Privacy
-
-Tenant contact info, photos, and receipts live in your Supabase project, isolated per account by RLS. The sample portfolio is a separate read-only account. Treat JSON backups like any file with tenant contact info.
+Current documentation: docs/RENTMANOR_PROJECT_REFERENCE.md; docs/RENTMANOR_CHATGPT_HANDOFF.md; docs/RENTMANOR_COMPLETE_REMEDIATION_SUMMARY.md; docs/RELEASE_RECOVERY_RUNBOOK.md; docs/THIRD_PARTY_NOTICES.md. Historical audit copies are preserved under docs/audit and do not describe the current code.

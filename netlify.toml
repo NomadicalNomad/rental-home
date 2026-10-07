@@ -1,4 +1,4 @@
-# One Netlify site, publish the repo root.
+# One Netlify site, publish only the curated static build.
 # Host rules:
 #   rentmanor.com (+ www → apex) → site/
 #   app.rentmanor.com             → app/
@@ -9,8 +9,8 @@
 # More-specific /site/* and /app/* rules come first.
 
 [build]
-  publish = "."
-  command = ""
+  publish = "dist"
+  command = "node scripts/build-static.mjs"
 
 # www → apex
 [[redirects]]

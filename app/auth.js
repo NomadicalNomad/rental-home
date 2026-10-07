@@ -1,3 +1,4 @@
+import {scopedClient} from './scoped-client.js';
 /* Auth + account + invite for RentManor (vanilla PWA, Supabase). */
 import { isSampleAccountId } from './account-scope.js';
 import { friendlyError as formatFriendlyError } from './errors.js';
@@ -17,6 +18,8 @@ let started = false;
 
 export function hasSupabaseConfig() {
   const config = window.RENTAL_HOME_CONFIG || {};
+  if (!Array.isArray(config.allowedHosts) || !config.allowedHosts.includes(location.hostname)) return false;
+  if (['localhost','127.0.0.1'].includes(location.hostname) && config.environment !== 'local') return false;
   const url = String(config.supabaseUrl || '').trim();
   const key = String(config.supabaseAnonKey || '').trim();
   if (!url || !key) return false;
@@ -30,6 +33,15 @@ export function hasSupabaseConfig() {
   }
 }
 
+export function listAccounts() { return currentMemberships.map(toAccount); }
+export async function switchAccount(id) {
+  if(!currentUser) throw new Error('Not signed in');
+  const rows=await loadMemberships(currentUser);const chosen=rows.find(r=>r.account_id===id);
+  if(!chosen || isSampleAccountId(id)) throw new Error('You are no longer a member of that account.');
+  currentMemberships=rows;currentAccount=toAccount(chosen);
+  localStorage.setItem('rentmanor-account:'+currentUser.id,id);
+  await emitSignedIn();
+}
 export function getSupabase() {
   return supabase;
 }
@@ -188,14 +200,14 @@ async function refreshInviteBanner() {
 async function createSupabaseClient() {
   const config = window.RENTAL_HOME_CONFIG;
   const { createClient } = await import(SUPABASE_JS);
-  return createClient(config.supabaseUrl, config.supabaseAnonKey, {
+  return scopedClient(createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storage: window.localStorage
     }
-  });
+  }),()=>currentAccount?.id || (isSampleRoute()?SAMPLE_ACCOUNT_ID:null));
 }
 
 async function rpc(name, args = {}) {
@@ -252,13 +264,15 @@ async function establishAccount(user) {
     warnings.push(error);
   }
 
-  let preferredId = null;
+  let preferredId = localStorage.getItem('rentmanor-account:'+user.id);
+  if(!getInviteToken() && user.user_metadata?.invite_token) sessionStorage.setItem(INVITE_STORAGE_KEY,user.user_metadata.invite_token);
   if (getInviteToken()) {
     try {
       preferredId = await acceptStoredInvite();
+      localStorage.setItem('rentmanor-account:'+user.id,preferredId);
     } catch (error) {
       const message = String(error?.message || '');
-      if (/not found|expired|different email/i.test(message)) clearInviteToken();
+      if (/not found|expired|different email|used|revoked/i.test(message)) clearInviteToken();
       inviteWarning = error;
     }
   }
@@ -447,6 +461,11 @@ export async function startAuth(callback) {
   authCallback = callback;
   captureInviteFromUrl();
 
+  const localSample = async () => {showScreen('app');await callback({status:'sample',supabase:null});};
+  bindAuthForms();
+  document.addEventListener('click',event=>{if(event.target.closest('[data-action="view-sample"]') && !supabase) enterSampleRoute();});
+  window.addEventListener('hashchange',()=>{if(!supabase) {if(isSampleRoute())localSample();else {showAuthMode(consumePendingAuthMode()||'signin');showScreen(hasSupabaseConfig()?'auth':'setup');}}});
+  if (isSampleRoute() && !hasSupabaseConfig()) {await localSample();return;}
   if (!hasSupabaseConfig()) {
     showScreen('setup');
     await callback({ status: 'need-config' });
@@ -456,6 +475,7 @@ export async function startAuth(callback) {
   try {
     supabase = await createSupabaseClient();
   } catch (error) {
+    if(isSampleRoute()){await localSample();return;}
     showScreen('setup');
     const detail = document.querySelector('#setupDetail');
     if (detail) {
@@ -465,8 +485,7 @@ export async function startAuth(callback) {
     return;
   }
 
-  bindAuthForms();
-  showAuthMode('signin');
+  showAuthMode(new URLSearchParams(location.search).get('mode')==='signup'?'signup':'signin');
   await refreshInviteBanner();
 
   let sessionJob = Promise.resolve();

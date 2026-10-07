@@ -22,7 +22,7 @@
         <a href="features.html" aria-current="page">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
         <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -58,10 +58,10 @@
       </div>
 
       <section class="a2hs" id="add-to-home-screen" aria-labelledby="a2hsHeading">
-        <h2 id="a2hsHeading">Add RentManor to your iPhone</h2>
+        <h2 id="a2hsHeading">Add the app to your iPhone</h2>
         <p>Takes about a minute. Use Safari — not Chrome.</p>
         <ol class="a2hs-list">
-          <li>Open <strong>rentmanor.com</strong> in <strong>Safari</strong> (not Chrome).</li>
+          <li>Open <strong>app.rentmanor.com</strong> in <strong>Safari</strong> (not Chrome).</li>
           <li>Tap the <strong>Share</strong> button.</li>
           <li>Tap <strong>Add to Home Screen</strong>.</li>
           <li>Tap <strong>Add</strong>.</li>
@@ -69,7 +69,7 @@
         <p>After that, the RentManor icon sits on your home screen. Open it anytime — you’ll sign in like usual.</p>
         <p>On a computer, bookmark the site. Home Screen install is for iPhone Safari.</p>
         <div class="cta-row">
-          <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+          <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
           <a class="button secondary" data-app-cta href="https://app.rentmanor.com/">Already have one? Sign in</a>
         </div>
       </section>
@@ -95,7 +95,7 @@
     (function () {
       if (!/\.github\.io$/i.test(location.hostname)) return;
       var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href + (a.textContent.trim()==='Create account' ? '?mode=signup' : ''); });
     })();
   </script>
 </body>

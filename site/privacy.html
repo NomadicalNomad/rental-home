@@ -22,7 +22,7 @@
         <a href="features.html">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
         <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -30,21 +30,21 @@
   <main class="page">
     <div class="wrap legal">
       <h1>Privacy</h1>
-      <p class="updated">Updated: September 19, 2026</p>
+      <p class="updated">Draft updated: October 6, 2026 — owner approval pending</p>
       <p>RentManor helps you manage rental property records for your account.</p>
 
       <h2>What we store</h2>
-      <p>Account email, and the property and tenant information you enter. Data for an account stays with that account. Invited members of an account can see that account’s properties.</p>
+      <p>Account email, and the property and tenant information you enter. Data for an account stays with that account. Owners and invited members can view, edit, delete and completely replace account records. Only owners administer invitations.</p>
 
       <h2>What we don’t do</h2>
-      <p>We don’t sell your information. We don’t run ads on your property list. We don’t mix one investor’s portfolio into another’s.</p>
+      <p>The implementation scopes private records to account memberships. Data-use and retention policies require the operator’s published policy.</p>
 
       <h2>Access</h2>
       <p>You can sign out anytime. You can export a backup of your account data from the app. If you want an account deleted, contact the person who runs this RentManor deployment.</p>
 
       <h2>Contact</h2>
       <p>Questions about this product’s privacy: ask the site operator (Damon for this deployment).</p>
-      <p><em>This page is a short product stub, not legal advice.</em></p>
+      <p><em>Draft only: operator contact, deletion handling, retention, and legal terms require owner approval.</em></p>
     </div>
   </main>
 
@@ -67,7 +67,7 @@
     (function () {
       if (!/\.github\.io$/i.test(location.hostname)) return;
       var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href + (a.textContent.trim()==='Create account' ? '?mode=signup' : ''); });
     })();
   </script>
 </body>

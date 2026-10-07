@@ -10,14 +10,7 @@
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
   <title>RentManor</title>
-  <script>
-    // Production fallback so a missing or SW-blocked config.js cannot wall visitors.
-    // config.js loads next and may override. Anon key is public-by-design (RLS).
-    window.RENTAL_HOME_CONFIG = {
-      supabaseUrl: 'https://khcwyxjhuayktrddodzg.supabase.co',
-      supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoY3d5eGpodWF5a3RyZGRvZHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4MzIzMjksImV4cCI6MjEwNTQwODMyOX0.KaZg12T0MWDB16Iy9i25vKhQ84XEA8qJfoGhRjsbmNA'
-    };
-  </script>
+
 </head>
 <body>
   <div id="loadingView" class="app-shell screen-center" hidden>
@@ -36,7 +29,7 @@
     <section class="auth-card">
       <h2>This copy isn’t connected yet</h2>
       <p id="setupDetail" class="muted">Add a <strong>config.js</strong> file with your project URL and anon key, then reload. See the README for the exact steps.</p>
-      <p class="muted">Until that file is in place, nobody can create an account or see properties. That is on purpose — there are no leftover demo logins.</p>
+      <p class="muted">Private accounts need a configured connection. The read-only sample works locally.</p><button type="button" class="secondary-button" data-action="view-sample">View sample</button>
     </section>
   </div>
 
@@ -253,6 +246,7 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
         <button class="modal-close" type="button" data-action="close-account" aria-label="Close">×</button>
         <h2 id="accountTitle">Your account</h2>
+        <label>Account <select id="accountSelector" aria-label="Select account"></select></label><p class="muted">Trusted members can edit, delete and restore this account.</p>
         <p id="accountSummary" class="muted">Signed in.</p>
         <div class="backup-actions">
           <button class="primary-button js-write" id="inviteButton" type="button">Invite someone</button>
@@ -268,7 +262,7 @@
         <button class="modal-close" type="button" data-action="close-invite" aria-label="Close">×</button>
         <h2 id="inviteTitle">Invite someone to this account</h2>
         <p class="muted">They’ll see the same properties you do. Other investors keep their own accounts.</p>
-        <div id="memberList" class="member-list muted"></div>
+        <div id="pendingInvites"></div><div id="memberList" class="member-list muted"></div>
         <form id="inviteForm" novalidate>
           <label>Their email <span class="optional">(optional)</span>
             <input name="email" type="email" autocomplete="off" maxlength="120" placeholder="friend@example.com">
@@ -276,7 +270,7 @@
           <button class="primary-button" type="submit">Create invite link</button>
         </form>
         <div id="inviteResult" class="invite-result" hidden>
-          <p class="muted">Send this link or code. It works for 14 days.</p>
+          <p class="muted">Send this link or code. It works once for 14 days. Old short codes require a new link.</p>
           <p class="share-code" id="inviteCode"></p>
           <button class="secondary-button" id="copyInviteButton" type="button">Copy link</button>
         </div>
@@ -372,8 +366,8 @@
     <div id="backupPanel" class="modal-backdrop" hidden>
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
         <button class="modal-close" type="button" data-action="close-backup" aria-label="Close">×</button>
-        <h2 id="backupTitle">Backup &amp; restore</h2>
-        <p class="muted">Backup saves property text data. Photos, receipts, lease, and correspondence stay in your account online. Restoring replaces the properties in this signed-in account, not other people’s.</p>
+        <h2 id="backupTitle">Backup &amp; restore</h2><p id="recoveryStatus" role="status"></p><button id="cancelRecovery" type="button" hidden>Cancel operation</button>
+        <p class="muted">Complete backups include account records and referenced files. Keep these sensitive downloads private. Complete replacement requires a verified recovery point. Older property-only files import without deleting existing data.</p>
         <div class="backup-actions">
           <button class="primary-button" id="downloadButton" type="button"><span aria-hidden="true">↓</span> Download backup</button>
           <button class="secondary-button js-write" id="restoreButton" type="button"><span aria-hidden="true">↥</span> Restore from file</button>

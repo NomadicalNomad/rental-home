@@ -1,9 +1,10 @@
-const CACHE_NAME = 'rentmanor-shell-v23';
+const CACHE_NAME = 'rentmanor-shell-v24';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './accessibility.js',
   './auth.js',
   './account-scope.js',
   './errors.js',
@@ -11,6 +12,19 @@ const APP_SHELL = [
   './property-tabs.js',
   './media.js',
   './export.js',
+  './pdf-report.js',
+  './scoped-client.js',
+  './validation.js',
+  './recovery.js',
+  './recovery-ui.js',
+  './vendor/pdf-lib.js',
+  './vendor/fontkit.js',
+  './fonts/NotoSans-Regular.ttf',
+  './sample-media/00000000-0000-4000-8000-000000000011.svg',
+  './sample-media/00000000-0000-4000-8000-000000000012.svg',
+  './sample-media/00000000-0000-4000-8000-000000000013.svg',
+  './sample-media/00000000-0000-4000-8000-000000000031.svg',
+  './sample-media/00000000-0000-4000-8000-000000000032.pdf',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -34,8 +48,7 @@ self.addEventListener('fetch', event => {
 
   // Never cache config.js. On failure do not return a fake JS body â€” that used to
   // execute as success without setting window.RENTAL_HOME_CONFIG and walled auth.
-  // Network-only: let a real miss fail the script load. Inline config in index.html
-  // still lets sign-in recover on the next paint.
+  // Network-only: a miss leaves private operations unavailable; local sample works.
   if (url.pathname.endsWith('/config.js') || url.pathname.endsWith('config.js')) {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' }).then(response => {
@@ -46,6 +59,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  if(url.searchParams.has('token')||url.pathname.includes('/storage/')||url.pathname.includes('/rest/'))return;
+  const allowed=APP_SHELL.some(path=>new URL(path,self.location.href).pathname===url.pathname);if(!allowed)return;
   const networkFirst = url.pathname.endsWith('/') || /\.(?:html|js|css)$/.test(url.pathname);
   if (networkFirst) {
     event.respondWith(fetch(event.request).then(response => {

@@ -22,7 +22,7 @@
         <a href="features.html">How it works</a>
         <a href="for-whom.html">Who it’s for</a>
         <a data-app-cta href="https://app.rentmanor.com/">Sign in</a>
-        <a class="button primary" data-app-cta href="https://app.rentmanor.com/">Create account</a>
+        <a class="button primary" data-app-cta href="https://app.rentmanor.com/?mode=signup">Create account</a>
       </nav>
     </div>
   </header>
@@ -30,14 +30,14 @@
   <main class="page">
     <div class="wrap legal">
       <h1>Terms of use</h1>
-      <p class="updated">Updated: September 19, 2026</p>
-      <p>By using RentManor you agree to these short terms.</p>
+      <p class="updated">Draft updated: October 6, 2026 — owner approval pending</p>
+      <p>This is a product policy draft awaiting owner approval.</p>
 
       <h2>The service</h2>
       <p>RentManor is a tool for managing your own rental records. You are responsible for the accuracy of what you enter and for how you use contact actions (call, text, email).</p>
 
       <h2>Accounts</h2>
-      <p>Keep your password private. If you invite someone to your account, they can see that account’s properties. Don’t invite people you don’t trust with that information.</p>
+      <p>Keep your password private. If you invite someone to your account, they can view, edit, delete and completely replace account records. Don’t invite people you don’t trust with that information.</p>
 
       <h2>Acceptable use</h2>
       <p>Don’t use RentManor to break the law, harass anyone, or try to access another account’s data.</p>
@@ -47,7 +47,7 @@
 
       <h2>Changes</h2>
       <p>These terms may be updated. The date at the top will change when they do.</p>
-      <p><em>This page is a short product stub, not legal advice.</em></p>
+      <p><em>Draft only: operator contact, deletion handling, retention, and legal terms require owner approval.</em></p>
     </div>
   </main>
 
@@ -70,7 +70,7 @@
     (function () {
       if (!/\.github\.io$/i.test(location.hostname)) return;
       var href = 'https://nomadicalnomad.github.io/rental-home/app/';
-      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href; });
+      document.querySelectorAll('[data-app-cta]').forEach(function (a) { a.href = href + (a.textContent.trim()==='Create account' ? '?mode=signup' : ''); });
     })();
   </script>
 </body>
