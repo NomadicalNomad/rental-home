@@ -5,8 +5,7 @@ export const SAMPLE_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 export const SAMPLE_ADDRESSES = [
   '1124 Iron Point Road',
   '704 Blue Ravine Road',
-  '1538 East Bidwell Street',
-  '889 Sibley Street'
+  '1538 East Bidwell Street'
 ];
 
 export function isSampleAccountId(id) {

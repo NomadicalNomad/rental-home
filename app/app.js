@@ -1465,7 +1465,9 @@ async function shareExportFile() {
   showToast(SHARE_UNAVAILABLE_TOAST, 4500);
 }
 
+let exportGeneration=0;
 async function generateExpenseExport(format) {
+  const originAccount=activeAccountId(),generation=++exportGeneration;
   const property = properties.find(item => item.id === exportPropertyId);
   const expenses = expensesByProperty.get(exportPropertyId) || [];
   const formatError = document.querySelector('#exportFormatError');
@@ -1488,6 +1490,7 @@ async function generateExpenseExport(format) {
     const payload = ext === 'pdf'
       ? await expensesToPdf({ address: property.address, list: expenses })
       : expensesToCsv(expenses);
+    if(activeAccountId()!==originAccount||generation!==exportGeneration)return;
     const blob = new Blob([payload], { type });
     const file = new File([blob], name, { type });
     const { count, total } = exportTotals(expenses);
@@ -1499,13 +1502,13 @@ async function generateExpenseExport(format) {
     if (share) share.disabled = false;
     if (save) save.disabled = false;
   } catch (error) {
+    if(activeAccountId()!==originAccount||generation!==exportGeneration)return;
     showToast(error.message);
     if (exportReadySheet) exportReadySheet.hidden = true;
     if (exportFormatSheet) exportFormatSheet.hidden = false;
     showExportError('#exportFormatError', true);
   } finally {
-    if (progress) progress.hidden = true;
-    setExportFormatBusy(false);
+    if(activeAccountId()===originAccount&&generation===exportGeneration){if (progress) progress.hidden = true;setExportFormatBusy(false);}
   }
 }
 
@@ -1530,7 +1533,9 @@ function showPhotoFailure(error) {
 }
 
 async function stageFormPhoto(file) {
+  const origin=activeAccountId();
   const compressed = await compressImageFile(file);
+  if(activeAccountId()!==origin)throw new Error('Account changed; photo cancelled.');
   pendingPhotoFile = compressed;
   revokeObjectUrl(pendingPhotoPreview);
   pendingPhotoPreview = URL.createObjectURL(compressed);
@@ -1893,6 +1898,7 @@ async function saveReceiptForExpense(property, expense, file = pendingReceiptFil
 }
 
 async function applyPickedReceipt(file) {
+  const origin=activeAccountId();
   if (!file || !canWrite()) return;
   if (filePickerContext === 'lease' || filePickerContext === 'correspondence') {
     await applyPickedTenantFile(file);
@@ -1902,6 +1908,7 @@ async function applyPickedReceipt(file) {
   const receiptError = document.querySelector('#receiptError');
   try {
     const ready = isPdf(file) ? assertPdfSize(file) : await compressImageFile(file);
+    if(activeAccountId()!==origin)throw new Error('Account changed; receipt cancelled.');
     pendingReceiptFile = ready;
     revokeObjectUrl(pendingReceiptPreview);
     pendingReceiptPreview = isPdf(ready) ? '' : URL.createObjectURL(ready);
@@ -2723,6 +2730,7 @@ function bindUi() {
 }
 
 function resetLocalState() {
+  exportGeneration++;
   closeModals();form.reset();
   if(detailView)detailView.innerHTML='';if(expenseView)expenseView.innerHTML='';
   const oldImage=document.querySelector('#lightboxImage');if(oldImage)oldImage.removeAttribute('src');

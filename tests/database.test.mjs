@@ -1,3 +1,4 @@
+import {samplePortfolio} from '../app/account-scope.js';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {PGlite} from '@electric-sql/pglite';
 const schema=fs.readFileSync(new URL('../supabase/schema.sql',import.meta.url),'utf8');
 const migration=fs.readFileSync(new URL('../supabase/migrations/20261007_complete_remediation.sql',import.meta.url),'utf8');
@@ -79,5 +80,6 @@ test('isolated PostgreSQL migrations, RLS, RPCs, recovery and constraints',async
 });
 test('fresh setup and documented older-installation migration order',async t=>{
  await t.test('full fresh schema includes identical forward remediation',async()=>{const db=await setup(schema);try{const r=await db.query("select to_regclass('public.recovery_stages') id");assert.ok(r.rows[0].id);await db.exec(migration);}finally{await db.close();}});
+ await t.test('fallback sample business fields align with fresh SQL seed',async()=>{const db=await setup(schema);try{const rows=(await db.query("select * from properties where account_id='00000000-0000-4000-8000-000000000001' order by id")).rows;fs.mkdirSync('tmp',{recursive:true});fs.writeFileSync('tmp/sample-seed.json',JSON.stringify(rows,null,2));for(const local of samplePortfolio()){const stored=rows.find(r=>r.id===local.id);assert.ok(stored);for(const key of Object.keys(local)){if(['thumbnail_path','created_at','updated_at'].includes(key))continue;assert.equal(['beds','baths','sqft','year_built'].includes(key)?Number(local[key]):String(local[key]??''),['beds','baths','sqft','year_built'].includes(key)?Number(stored[key]):String(stored[key]??''),key+' '+local.id);}}}finally{await db.close();}});
  await t.test('pre-tabs historical installation upgrades with safe forward bridge',async()=>{const db=await setup(fs.readFileSync(new URL('./fixtures/schema-before-tabs.sql',import.meta.url),'utf8'));try{for(const file of ['20260919_photos_expenses_sample.sql','20261007_tabs_upgrade_bridge.sql','20261007_complete_remediation.sql'])await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));assert.ok((await db.query("select to_regclass('public.recovery_stages') id")).rows[0].id);}finally{await db.close();}});
 });
