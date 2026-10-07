@@ -11,6 +11,8 @@
  * or keep config.js gitignored and set the same values another way.
  */
 window.RENTAL_HOME_CONFIG = {
+  environment: 'local',
+  allowedHosts: ['localhost', '127.0.0.1'],
   supabaseUrl: 'https://YOUR_PROJECT.supabase.co',
   supabaseAnonKey: 'YOUR_SUPABASE_ANON_KEY'
 };

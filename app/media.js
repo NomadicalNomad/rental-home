@@ -1,4 +1,5 @@
 /* Compress, upload, and resolve private account-media objects. */
+import { assertFileSignature } from './validation.js';
 import { getSupabase, SAMPLE_ACCOUNT_ID } from './auth.js';
 
 const BUCKET = 'account-media';
@@ -8,6 +9,7 @@ const MAX_PDF_BYTES = 8 * 1024 * 1024;
 const SIGN_TTL = 3600;
 
 const signedCache = new Map();
+export function clearMediaCache(){signedCache.clear();}
 
 export function thumbnailObjectPath(accountId, propertyId, ext = 'jpg') {
   return `${accountId}/properties/${propertyId}/thumbnail.${ext}`;
@@ -140,7 +142,8 @@ export function assertPdfSize(file) {
   });
 }
 
-export async function uploadAccountMedia(path, file, { upsert = true } = {}) {
+export async function uploadAccountMedia(path, file, { upsert = false } = {}) {
+  await assertFileSignature(await file.arrayBuffer(),file.type);
   const supabase = getSupabase();
   if (!supabase) throw new Error('Not signed in');
   const contentType = isPdf(file)
@@ -166,11 +169,14 @@ export async function uploadAccountMedia(path, file, { upsert = true } = {}) {
 }
 
 export async function removeAccountMedia(paths) {
-  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  const list = [...new Set((Array.isArray(paths) ? paths : [paths]).filter(Boolean))];
   if (!list.length) return;
   const supabase = getSupabase();
   if (!supabase) return;
-  const { error } = await supabase.storage.from(BUCKET).remove(list);
+  const safe=[];
+  for(const path of list){const {data,error}=await supabase.rpc('media_is_referenced',{object_path:path});if(error)throw error;if(!data)safe.push(path);}
+  if(!safe.length)return;
+  const { error } = await supabase.storage.from(BUCKET).remove(safe);
   if (error) throw error;
   list.forEach(path => signedCache.delete(path));
 }

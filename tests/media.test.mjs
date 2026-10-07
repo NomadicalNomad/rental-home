@@ -35,6 +35,6 @@ test('normalizeImageFile fills empty picker MIME from the filename', () => {
 
 test('service worker cache name bumped past v22', () => {
   const sw = readFileSync(join(root, 'app/sw.js'), 'utf8');
-  assert.match(sw, /rentmanor-shell-v23/);
+  assert.match(sw, /rentmanor-shell-v24/);
   assert.doesNotMatch(sw, /rentmanor-shell-v22/);
 });

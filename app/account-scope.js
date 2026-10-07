@@ -5,8 +5,7 @@ export const SAMPLE_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 export const SAMPLE_ADDRESSES = [
   '1124 Iron Point Road',
   '704 Blue Ravine Road',
-  '1538 East Bidwell Street',
-  '889 Sibley Street'
+  '1538 East Bidwell Street'
 ];
 
 export function isSampleAccountId(id) {
@@ -49,7 +48,7 @@ export function personalListFromRows(rows, accountId) {
 export function samplePortfolio() {
   return [
     {
-      id: '10000000-0000-4000-8000-000000000001',
+      id: '00000000-0000-4000-8000-000000000011',
       account_id: SAMPLE_ACCOUNT_ID,
       address: '1124 Iron Point Road',
       city: 'Folsom',
@@ -78,7 +77,7 @@ export function samplePortfolio() {
       updated_at: '2026-01-01T00:00:00.000Z'
     },
     {
-      id: '10000000-0000-4000-8000-000000000002',
+      id: '00000000-0000-4000-8000-000000000012',
       account_id: SAMPLE_ACCOUNT_ID,
       address: '704 Blue Ravine Road',
       city: 'Folsom',
@@ -107,7 +106,7 @@ export function samplePortfolio() {
       updated_at: '2026-01-01T00:00:00.000Z'
     },
     {
-      id: '10000000-0000-4000-8000-000000000003',
+      id: '00000000-0000-4000-8000-000000000013',
       account_id: SAMPLE_ACCOUNT_ID,
       address: '1538 East Bidwell Street',
       city: 'Folsom',
@@ -134,65 +133,36 @@ export function samplePortfolio() {
       trash_notes: 'Extra green-waste pickup in fall.',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z'
-    },
-    {
-      id: '10000000-0000-4000-8000-000000000004',
-      account_id: SAMPLE_ACCOUNT_ID,
-      address: '889 Sibley Street',
-      city: 'Folsom',
-      state: 'CA',
-      zip: '95630',
-      status: 'vacant',
-      tenant_name: '',
-      phone: '',
-      email: '',
-      rent: '1950',
-      notes: '',
-      thumbnail_path: './sample-media/00000000-0000-4000-8000-000000000012.svg',
-      beds: 2,
-      baths: 1,
-      sqft: 980,
-      year_built: 1986,
-      property_type: 'Condo',
-      description: 'Ground-floor condo. Quiet street near the park.',
-      utility_electric: 'SMUD',
-      utility_gas: '',
-      utility_water: 'City of Folsom',
-      utility_notes: 'HOA covers water and trash.',
-      trash_schedule: 'Tuesday mornings',
-      trash_notes: '',
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:00.000Z'
     }
+
   ];
 }
 
 export function samplePhotos() {
   return [
-    { id: '10000000-0000-4000-8000-000000000041', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', storagePath: './sample-media/00000000-0000-4000-8000-000000000011.svg', sortOrder: 0, isPrimary: true },
-    { id: '10000000-0000-4000-8000-000000000042', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', storagePath: './sample-media/00000000-0000-4000-8000-000000000012.svg', sortOrder: 1, isPrimary: false },
-    { id: '10000000-0000-4000-8000-000000000043', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000002', storagePath: './sample-media/00000000-0000-4000-8000-000000000012.svg', sortOrder: 0, isPrimary: true },
-    { id: '10000000-0000-4000-8000-000000000044', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', storagePath: './sample-media/00000000-0000-4000-8000-000000000013.svg', sortOrder: 0, isPrimary: true },
-    { id: '10000000-0000-4000-8000-000000000045', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000004', storagePath: './sample-media/00000000-0000-4000-8000-000000000012.svg', sortOrder: 0, isPrimary: true }
+    { id: '00000000-0000-4000-8000-000000000041', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', storagePath: './sample-media/00000000-0000-4000-8000-000000000011.svg', sortOrder: 0, isPrimary: true },
+    { id: '00000000-0000-4000-8000-000000000042', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', storagePath: './sample-media/00000000-0000-4000-8000-000000000012.svg', sortOrder: 1, isPrimary: false },
+    { id: '00000000-0000-4000-8000-000000000043', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000012', storagePath: './sample-media/00000000-0000-4000-8000-000000000012.svg', sortOrder: 0, isPrimary: true },
+    { id: '00000000-0000-4000-8000-000000000044', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', storagePath: './sample-media/00000000-0000-4000-8000-000000000013.svg', sortOrder: 0, isPrimary: true }
   ];
 }
 
 export function sampleAppliances() {
   return [
-    { id: '10000000-0000-4000-8000-000000000071', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', name: 'Range', fuel: 'gas', notes: 'Replaced 2023.' },
-    { id: '10000000-0000-4000-8000-000000000072', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', name: 'Dryer', fuel: 'electric', notes: 'In the garage.' },
-    { id: '10000000-0000-4000-8000-000000000073', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', name: 'Refrigerator', fuel: 'electric', notes: '' },
-    { id: '10000000-0000-4000-8000-000000000074', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000002', name: 'Range', fuel: 'electric', notes: 'Works. Leave for the next tenant.' },
-    { id: '10000000-0000-4000-8000-000000000075', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', name: 'Washer', fuel: 'electric', notes: 'Shared laundry closet.' }
+    { id: '00000000-0000-4000-8000-000000000071', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', name: 'Range', fuel: 'gas', notes: 'Replaced 2023.' },
+    { id: '00000000-0000-4000-8000-000000000072', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', name: 'Dryer', fuel: 'electric', notes: 'In the garage.' },
+    { id: '00000000-0000-4000-8000-000000000073', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', name: 'Refrigerator', fuel: 'electric', notes: '' },
+    { id: '00000000-0000-4000-8000-000000000074', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000012', name: 'Range', fuel: 'electric', notes: 'Works. Leave for the next tenant.' },
+    { id: '00000000-0000-4000-8000-000000000075', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', name: 'Washer', fuel: 'electric', notes: 'Shared laundry closet.' }
   ];
 }
 
 export function sampleTenants() {
   return [
     {
-      id: '10000000-0000-4000-8000-000000000061',
+      id: '00000000-0000-4000-8000-000000000061',
       accountId: SAMPLE_ACCOUNT_ID,
-      propertyId: '10000000-0000-4000-8000-000000000001',
+      propertyId: '00000000-0000-4000-8000-000000000011',
       name: 'Maria Hernandez',
       phone: '(916) 555-0148',
       email: 'maria.h@example.com',
@@ -202,9 +172,9 @@ export function sampleTenants() {
       leaseFileName: 'hernandez-lease.pdf'
     },
     {
-      id: '10000000-0000-4000-8000-000000000063',
+      id: '00000000-0000-4000-8000-000000000063',
       accountId: SAMPLE_ACCOUNT_ID,
-      propertyId: '10000000-0000-4000-8000-000000000003',
+      propertyId: '00000000-0000-4000-8000-000000000013',
       name: 'James Wilson',
       phone: '(916) 555-0196',
       email: 'james.wilson@example.com',
@@ -219,10 +189,10 @@ export function sampleTenants() {
 export function sampleTenantFiles() {
   return [
     {
-      id: '10000000-0000-4000-8000-000000000081',
+      id: '00000000-0000-4000-8000-000000000081',
       accountId: SAMPLE_ACCOUNT_ID,
-      tenantId: '10000000-0000-4000-8000-000000000061',
-      propertyId: '10000000-0000-4000-8000-000000000001',
+      tenantId: '00000000-0000-4000-8000-000000000061',
+      propertyId: '00000000-0000-4000-8000-000000000011',
       kind: 'correspondence',
       storagePath: './sample-media/00000000-0000-4000-8000-000000000031.svg',
       contentType: 'image/svg+xml',

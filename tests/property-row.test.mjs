@@ -20,9 +20,9 @@ const home = {
   updatedAt: '2026-09-19T00:00:00.000Z'
 };
 
-test('toPropertyRow omits empty thumbnail_path so Add home works before the column exists', () => {
+test('toPropertyRow explicitly clears thumbnail_path; migrations are required', () => {
   const row = toPropertyRow({ ...home, thumbnailPath: '' }, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-  assert.equal('thumbnail_path' in row, false);
+  assert.equal(row.thumbnail_path, null);
   assert.equal(row.address, '42 UX Lane');
   assert.equal(row.account_id, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   assert.equal(row.rent, '1800');

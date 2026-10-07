@@ -1,5 +1,4 @@
-/* Property ↔ Postgres row mapping. Omit empty optional columns so Add home
-   still works if a later migration has not been applied yet. */
+/* Explicitly present optional fields serialize clearing; absent fields remain absent. */
 
 export const OPTIONAL_PROPERTY_COLUMNS = [
   'thumbnail_path',
@@ -39,22 +38,22 @@ export function toPropertyRow(property, accountId) {
     tenant_name: property.tenantName || '',
     phone: property.phone || '',
     email: property.email || '',
-    rent: property.rent || '',
+    rent: property.rent ?? '',
     notes: property.notes || '',
     created_at: property.createdAt,
     updated_at: property.updatedAt
   };
-  const thumb = String(property.thumbnailPath || property.thumbnail_path || '').trim();
-  if (thumb) row.thumbnail_path = thumb;
+  const thumb = String(property.thumbnailPath ?? property.thumbnail_path ?? '').trim();
+  if ('thumbnailPath' in property || 'thumbnail_path' in property) row.thumbnail_path = thumb || null;
 
   const beds = optionalNumber(property.beds);
   const baths = optionalNumber(property.baths);
   const sqft = optionalNumber(property.sqft);
   const yearBuilt = optionalNumber(property.yearBuilt ?? property.year_built);
-  if (beds != null) row.beds = beds;
-  if (baths != null) row.baths = baths;
-  if (sqft != null) row.sqft = Math.round(sqft);
-  if (yearBuilt != null) row.year_built = Math.round(yearBuilt);
+  if ('beds' in property || 'beds' in property) row.beds = beds;
+  if ('baths' in property || 'baths' in property) row.baths = baths;
+  if ('sqft' in property || 'sqft' in property) row.sqft = sqft;
+  if ('yearBuilt' in property || 'year_built' in property) row.year_built = yearBuilt;
 
   const type = optionalText(property.propertyType ?? property.property_type);
   const description = optionalText(property.description);
@@ -64,14 +63,14 @@ export function toPropertyRow(property, accountId) {
   const utilityNotes = optionalText(property.utilityNotes ?? property.utility_notes);
   const trashSchedule = optionalText(property.trashSchedule ?? property.trash_schedule);
   const trashNotes = optionalText(property.trashNotes ?? property.trash_notes);
-  if (type) row.property_type = type;
-  if (description) row.description = description;
-  if (utilityElectric) row.utility_electric = utilityElectric;
-  if (utilityGas) row.utility_gas = utilityGas;
-  if (utilityWater) row.utility_water = utilityWater;
-  if (utilityNotes) row.utility_notes = utilityNotes;
-  if (trashSchedule) row.trash_schedule = trashSchedule;
-  if (trashNotes) row.trash_notes = trashNotes;
+  if ('propertyType' in property || 'property_type' in property) row.property_type = type;
+  if ('description' in property || 'description' in property) row.description = description;
+  if ('utilityElectric' in property || 'utility_electric' in property) row.utility_electric = utilityElectric;
+  if ('utilityGas' in property || 'utility_gas' in property) row.utility_gas = utilityGas;
+  if ('utilityWater' in property || 'utility_water' in property) row.utility_water = utilityWater;
+  if ('utilityNotes' in property || 'utility_notes' in property) row.utility_notes = utilityNotes;
+  if ('trashSchedule' in property || 'trash_schedule' in property) row.trash_schedule = trashSchedule;
+  if ('trashNotes' in property || 'trash_notes' in property) row.trash_notes = trashNotes;
   return row;
 }
 

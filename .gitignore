@@ -9,3 +9,9 @@ Thumbs.db
 config.js
 config.local.js
 app/config.local.js
+
+node_modules/
+tmp/
+output/
+
+dist/

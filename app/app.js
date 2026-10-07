@@ -1,3 +1,10 @@
+import {bindAccessibility} from './accessibility.js';
+bindAccessibility();
+import {validateMoney,validateDate,validateProperty} from './validation.js';
+import {downloadCompleteBackup,restoreFromFile,cancelRecovery,recoveryBusy} from './recovery-ui.js';
+import {legacyFingerprint} from './recovery.js';
+import {listAccounts,switchAccount} from './auth.js';
+import {clearMediaCache} from './media.js';
 /* RentManor — per-account property manager (Supabase-backed). */
 import {
   SAMPLE_ACCOUNT_ID,
@@ -32,7 +39,7 @@ import {
   setSampleHash
 } from './auth.js';
 import { isMissingColumnError, isSchemaSetupError } from './errors.js';
-import { toPropertyRow, withoutOptionalPropertyColumns, withoutThumbnailPath } from './property-row.js';
+import { toPropertyRow } from './property-row.js';
 import {
   detailHeaderHtml,
   detailTabsHtml,
@@ -129,11 +136,11 @@ let confirmResolve = null;
 let usingSampleFallback = false;
 
 const SAMPLE_FALLBACK_EXPENSES = [
-  { id: '00000000-0000-4000-8000-000000000021', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', spentOn: '2026-09-12', amount: 84, category: 'Repairs', notes: 'HVAC filter', createdAt: '2026-09-12T17:10:00Z', updatedAt: '2026-09-12T17:10:00Z' },
-  { id: '00000000-0000-4000-8000-000000000022', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000001', spentOn: '2026-01-15', amount: 420, category: 'Insurance', notes: 'Annual landlord policy', createdAt: '2026-01-15T18:00:00Z', updatedAt: '2026-01-15T18:00:00Z' },
-  { id: '00000000-0000-4000-8000-000000000023', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000002', spentOn: '2026-08-03', amount: 186.5, category: 'Supplies', notes: 'Living room paint', createdAt: '2026-08-03T18:20:00Z', updatedAt: '2026-08-03T18:20:00Z' },
-  { id: '00000000-0000-4000-8000-000000000024', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', spentOn: '2026-09-08', amount: 62.4, category: 'Utilities', notes: 'Water', createdAt: '2026-09-08T16:40:00Z', updatedAt: '2026-09-08T16:40:00Z' },
-  { id: '00000000-0000-4000-8000-000000000025', accountId: SAMPLE_ACCOUNT_ID, propertyId: '10000000-0000-4000-8000-000000000003', spentOn: '2026-09-01', amount: 75, category: 'Other', notes: 'Gardener', createdAt: '2026-09-01T15:00:00Z', updatedAt: '2026-09-01T15:00:00Z' }
+  { id: '00000000-0000-4000-8000-000000000021', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-09-12', amount: 84, category: 'Repairs', notes: 'HVAC filter', createdAt: '2026-09-12T17:10:00Z', updatedAt: '2026-09-12T17:10:00Z' },
+  { id: '00000000-0000-4000-8000-000000000022', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000011', spentOn: '2026-01-15', amount: 420, category: 'Insurance', notes: 'Annual landlord policy', createdAt: '2026-01-15T18:00:00Z', updatedAt: '2026-01-15T18:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000023', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000012', spentOn: '2026-08-03', amount: 186.5, category: 'Supplies', notes: 'Living room paint', createdAt: '2026-08-03T18:20:00Z', updatedAt: '2026-08-03T18:20:00Z' },
+  { id: '00000000-0000-4000-8000-000000000024', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-08', amount: 62.4, category: 'Utilities', notes: 'Water', createdAt: '2026-09-08T16:40:00Z', updatedAt: '2026-09-08T16:40:00Z' },
+  { id: '00000000-0000-4000-8000-000000000025', accountId: SAMPLE_ACCOUNT_ID, propertyId: '00000000-0000-4000-8000-000000000013', spentOn: '2026-09-01', amount: 75, category: 'Other', notes: 'Gardener', createdAt: '2026-09-01T15:00:00Z', updatedAt: '2026-09-01T15:00:00Z' }
 ];
 
 const SAMPLE_FALLBACK_RECEIPTS = [
@@ -205,7 +212,7 @@ function canWrite() {
 function cleanProperty(value, index = 0) {
   if (!value || typeof value !== 'object') return null;
   const status = value.status === 'occupied' ? 'occupied' : 'vacant';
-  const text = (field, max = 1000) => String(value[field] ?? '').trim().slice(0, max);
+  const text = (field, max = 1000) => String(value[field] ?? '').trim();
   const tenantName = text('tenantName', 100) || text('tenant_name', 100);
   const id = text('id', 100);
   return {
@@ -279,25 +286,10 @@ function toRow(property) {
   return toPropertyRow(property, getAccount().id);
 }
 
-const OPTIONAL_LOOKS = /beds|baths|sqft|year_built|property_type|description|utility_|trash_|thumbnail_path/i;
-
 async function writePropertyRows(rows, { existingId = null } = {}) {
-  const supabase = getSupabase();
-  if (!supabase) throw new Error('Could not connect. Check your internet and try again.');
-  const table = supabase.from('properties');
-  const first = existingId
-    ? await table.update(rows[0]).eq('id', existingId)
-    : await table.insert(rows);
-  if (!first.error) return;
-  const missingOptional = OPTIONAL_LOOKS.test(String(first.error?.message || ''))
-    || isMissingColumnError(first.error)
-    || rows.some(row => row.thumbnail_path) && isMissingColumnError(first.error, 'thumbnail_path');
-  if (!missingOptional) throw first.error;
-  const fallback = rows.map(row => withoutOptionalPropertyColumns(withoutThumbnailPath(row)));
-  const retry = existingId
-    ? await supabase.from('properties').update(fallback[0]).eq('id', existingId)
-    : await supabase.from('properties').insert(fallback);
-  if (retry.error) throw retry.error;
+  assertWritable();const supabase=getSupabase();
+  const {error}=existingId?await supabase.from('properties').update(rows[0]).eq('id',existingId).eq('account_id',activeAccountId()):await supabase.from('properties').insert(rows);
+  if(error)throw error;
 }
 
 function fromExpenseRow(row) {
@@ -588,9 +580,7 @@ async function loadPhotos(propertyId) {
       photosByProperty.set(propertyId, list.length ? list : thumbnailAsPhotos(property));
       return photosByProperty.get(propertyId);
     }
-    const list = thumbnailAsPhotos(property);
-    photosByProperty.set(propertyId, list);
-    return list;
+    throw error;
   }
   const list = (data || []).map(fromPhotoRow);
   photosByProperty.set(propertyId, list);
@@ -623,8 +613,7 @@ async function loadAppliances(propertyId) {
       appliancesByProperty.set(propertyId, list);
       return list;
     }
-    appliancesByProperty.set(propertyId, []);
-    return [];
+    throw error;
   }
   const list = (data || []).map(fromApplianceRow);
   appliancesByProperty.set(propertyId, list);
@@ -655,9 +644,7 @@ async function loadTenant(propertyId) {
       tenantByProperty.set(propertyId, tenant ? { ...tenant, propertyId } : null);
       return tenantByProperty.get(propertyId);
     }
-    const tenant = contactAsTenant(property);
-    tenantByProperty.set(propertyId, tenant);
-    return tenant;
+    throw error;
   }
   const tenant = data ? fromTenantRow(data) : null;
   tenantByProperty.set(propertyId, tenant);
@@ -687,8 +674,7 @@ async function loadTenantFiles(tenantId) {
       tenantFilesByTenant.set(tenantId, list);
       return list;
     }
-    tenantFilesByTenant.set(tenantId, []);
-    return [];
+    throw error;
   }
   const list = (data || []).map(fromTenantFileRow);
   tenantFilesByTenant.set(tenantId, list);
@@ -701,7 +687,7 @@ async function loadPropertyExtras(propertyId) {
     loadAppliances(propertyId),
     loadTenant(propertyId)
   ]);
-  if (tenant?.id) await loadTenantFiles(tenant.id).catch(() => []);
+  if (tenant?.id) await loadTenantFiles(tenant.id);
   return { photos, appliances, tenant };
 }
 
@@ -997,7 +983,7 @@ async function applySamplePath() {
   }
   if (route.expenseId) {
     detailTab = 'expenses';
-    const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id).catch(() => []);
+    const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id);
     const expense = expenses.find(item => item.id === route.expenseId);
     if (expense) {
       await openExpense(property, expense);
@@ -1065,22 +1051,24 @@ async function renderDetail(property) {
   if (!property) { showView('list'); return; }
   const draft = captureDetailDraft();
   detailPropertyId = property.id;
+  let readFailure=null;
   let expenses = expensesByProperty.get(property.id);
   if (!expenses) {
     try {
       expenses = await loadExpenses(property.id);
-      await Promise.all(expenses.map(item => loadReceipts(item.id).catch(() => [])));
+      await Promise.all(expenses.map(item => loadReceipts(item.id)));
     } catch (error) {
-      expenses = [];
+      expenses = [];readFailure=error;
       showToast(friendlyError(error));
     }
   }
   try {
     await loadPropertyExtras(property.id);
   } catch (error) {
+    readFailure=error;
     showToast(friendlyError(error));
   }
-  const write = canWrite();
+  const write = canWrite()&&!readFailure;
   const photos = photosByProperty.get(property.id) || thumbnailAsPhotos(property);
   const cover = photos.find(item => item.isPrimary) || photos[0];
   const heroPath = cover?.storagePath || property.thumbnailPath || '';
@@ -1107,6 +1095,7 @@ async function renderDetail(property) {
         ${detailHeaderHtml(property, { location: propertyLocation(property), rent: currency(property.rent), write })}
         ${detailTabsHtml(tab)}
       </div>
+      ${readFailure?'<p role="alert">Some records could not be loaded. Reconnect or apply required migration before editing; this is not an empty portfolio.</p>':''}
       <div class="detail-panel" role="tabpanel" id="panel-${tab}" aria-labelledby="tab-${tab}">${panel}</div>`;
   showView('detail');
   syncStickyOffset();
@@ -1185,7 +1174,8 @@ function readForm() {
   if (!data.status) return { error: 'Please choose whether this home is occupied or vacant.' };
   if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
   if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
-  return { data: { ...data, state: data.state.toUpperCase(), tenantName: existingTenantName(editingId), phone: '', email: '' } };
+  try {validateProperty(data);}catch(error){return {error:error.message};}
+  return { data: { ...data, state: data.state.toUpperCase(), tenantName: existingTenantName(editingId), phone: properties.find(p=>p.id===editingId)?.phone || '', email: properties.find(p=>p.id===editingId)?.email || '' } };
 }
 
 function readPropertyDetail(formEl) {
@@ -1194,6 +1184,7 @@ function readPropertyDetail(formEl) {
   if (!data.address || !data.city || !data.state || !data.zip) return { error: 'Please fill in the required property fields.' };
   if (!/^\d{5}(-\d{4})?$/.test(data.zip)) return { error: 'Please enter a valid 5-digit ZIP code.' };
   if (data.rent && (!Number.isFinite(Number(data.rent)) || Number(data.rent) < 0)) return { error: 'Monthly rent must be a positive number.' };
+  try {validateProperty(data);}catch(error){return {error:error.message};}
   return { data: { ...data, state: data.state.toUpperCase() } };
 }
 
@@ -1258,6 +1249,7 @@ function galleryPhotoCount(propertyId) {
 }
 
 async function addGalleryPhoto(property, file) {
+  const accountAtStart=activeAccountId();
   if (!property?.id) throw new Error('Couldn’t add that photo. Try again.');
   if (!file) throw new Error('Please choose a photo.');
   const existingCount = galleryPhotoCount(property.id);
@@ -1268,36 +1260,24 @@ async function addGalleryPhoto(property, file) {
   const ready = await compressImageFile(file);
   const photoId = makeId();
   const ext = extensionForType(ready.type, 'jpg');
-  const galleryPath = galleryPhotoPath(activeAccountId(), property.id, photoId, ext);
-  const existing = photosByProperty.get(property.id) || await loadPhotos(property.id).catch(() => []);
+  if(activeAccountId()!==accountAtStart)throw new Error('Account changed; photo cancelled.');
+  const galleryPath = galleryPhotoPath(accountAtStart, property.id, photoId, ext);
+  const existing = photosByProperty.get(property.id) || await loadPhotos(property.id);
   const makePrimary = existing.length === 0;
-  let path = galleryPath;
-  try {
-    await uploadAccountMedia(galleryPath, ready);
-  } catch (error) {
-    path = thumbnailObjectPath(activeAccountId(), property.id, ext);
-    await uploadAccountMedia(path, ready);
-  }
+  const path=galleryPath;
+  await uploadAccountMedia(path,ready);
+
   const supabase = getSupabase();
   const row = {
     id: photoId,
-    account_id: activeAccountId(),
+    account_id: accountAtStart,
     property_id: property.id,
     storage_path: path,
     sort_order: existing.length,
     is_primary: makePrimary
   };
-  const inserted = await supabase.from('property_photos').insert(row);
-  if (inserted.error) {
-    if (!isSchemaSetupError(inserted.error) && !isMissingColumnError(inserted.error)) throw inserted.error;
-    const { error } = await supabase.from('properties').update({ thumbnail_path: path }).eq('id', property.id);
-    if (error) throw error;
-    return { ...property, thumbnailPath: path };
-  }
-  if (makePrimary) {
-    const { error } = await supabase.from('properties').update({ thumbnail_path: path }).eq('id', property.id);
-    if (error && !isMissingColumnError(error, 'thumbnail_path')) throw error;
-  }
+  try{if(activeAccountId()!==accountAtStart)throw new Error('Account changed; photo cancelled.');await supabase.from('property_photos').insert(row);}catch(error){try{await removeAccountMedia(path);}catch(cleanupError){showToast('Photo not committed; staged file retained for cleanup.');}throw error;}
+
   await loadPhotos(property.id);
   return { ...property, thumbnailPath: makePrimary ? path : property.thumbnailPath };
 }
@@ -1313,11 +1293,15 @@ async function submitForm(event) {
   const saved = existing
     ? { ...existing, ...result.data, updatedAt: now }
     : { ...result.data, id: makeId(), thumbnailPath: '', createdAt: now, updatedAt: now };
+  if(existing?.status==='occupied'&&saved.status==='vacant'&&!await askConfirm({title:'Remove current tenant?',message:'Mark vacant and remove current tenant, lease and correspondence records? Keep a complete backup first.',confirmLabel:'Mark vacant'}))return;
   submit.disabled = true;
   try {
     if (existing) await writePropertyRows([toRow(saved)], { existingId: saved.id });
     else await writePropertyRows([toRow(saved)]);
-    const withPhoto = await savePropertyPhoto(saved);
+    editingId=saved.id;
+    await loadProperties();
+    let withPhoto=saved;
+    try{withPhoto=await savePropertyPhoto(saved);}catch(error){showFormError('Home saved, but photo was not saved. Retry photo or return to this home. '+friendlyError(error));return;}
     pendingPhotoFile = null;
     revokeObjectUrl(pendingPhotoPreview);
     pendingPhotoPreview = '';
@@ -1339,17 +1323,17 @@ async function submitForm(event) {
 async function collectPropertyMediaPaths(property) {
   const paths = [];
   if (property.thumbnailPath) paths.push(property.thumbnailPath);
-  const photos = photosByProperty.get(property.id) || await loadPhotos(property.id).catch(() => []);
+  const photos = photosByProperty.get(property.id) || await loadPhotos(property.id);
   photos.forEach(photo => { if (photo.storagePath) paths.push(photo.storagePath); });
-  const tenant = tenantByProperty.get(property.id) || await loadTenant(property.id).catch(() => null);
+  const tenant = tenantByProperty.get(property.id) || await loadTenant(property.id);
   if (tenant?.leaseStoragePath) paths.push(tenant.leaseStoragePath);
   if (tenant?.id) {
-    const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id).catch(() => []);
+    const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id);
     files.forEach(file => { if (file.storagePath) paths.push(file.storagePath); });
   }
-  const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id).catch(() => []);
+  const expenses = expensesByProperty.get(property.id) || await loadExpenses(property.id);
   for (const expense of expenses) {
-    const receipts = receiptsByExpense.get(expense.id) || await loadReceipts(expense.id).catch(() => []);
+    const receipts = receiptsByExpense.get(expense.id) || await loadReceipts(expense.id);
     receipts.forEach(receipt => { if (receipt.storagePath) paths.push(receipt.storagePath); });
   }
   return [...new Set(paths)];
@@ -1363,7 +1347,7 @@ async function deleteProperty(propertyId = editingId) {
     const paths = await collectPropertyMediaPaths(property);
     const { error } = await getSupabase().from('properties').delete().eq('id', property.id);
     if (error) throw error;
-    try { await removeAccountMedia(paths); } catch (_) { /* rows are gone */ }
+    try { await removeAccountMedia(paths); } catch (error) { showToast('Records deleted; files retained for operator cleanup.'); }
     expensesByProperty.delete(property.id);
     await loadProperties();
     showToast('Property deleted.');
@@ -1481,7 +1465,9 @@ async function shareExportFile() {
   showToast(SHARE_UNAVAILABLE_TOAST, 4500);
 }
 
+let exportGeneration=0;
 async function generateExpenseExport(format) {
+  const originAccount=activeAccountId(),generation=++exportGeneration;
   const property = properties.find(item => item.id === exportPropertyId);
   const expenses = expensesByProperty.get(exportPropertyId) || [];
   const formatError = document.querySelector('#exportFormatError');
@@ -1502,8 +1488,9 @@ async function generateExpenseExport(format) {
     const name = exportFileName(property.address, ext, { sample: sampleMode });
     const type = ext === 'pdf' ? 'application/pdf' : 'text/csv';
     const payload = ext === 'pdf'
-      ? expensesToPdf({ address: property.address, list: expenses })
+      ? await expensesToPdf({ address: property.address, list: expenses })
       : expensesToCsv(expenses);
+    if(activeAccountId()!==originAccount||generation!==exportGeneration)return;
     const blob = new Blob([payload], { type });
     const file = new File([blob], name, { type });
     const { count, total } = exportTotals(expenses);
@@ -1514,13 +1501,14 @@ async function generateExpenseExport(format) {
     if (summaryEl) summaryEl.textContent = `${count} ${count === 1 ? 'expense' : 'expenses'} · ${money(total)}`;
     if (share) share.disabled = false;
     if (save) save.disabled = false;
-  } catch (_) {
+  } catch (error) {
+    if(activeAccountId()!==originAccount||generation!==exportGeneration)return;
+    showToast(error.message);
     if (exportReadySheet) exportReadySheet.hidden = true;
     if (exportFormatSheet) exportFormatSheet.hidden = false;
     showExportError('#exportFormatError', true);
   } finally {
-    if (progress) progress.hidden = true;
-    setExportFormatBusy(false);
+    if(activeAccountId()===originAccount&&generation===exportGeneration){if (progress) progress.hidden = true;setExportFormatBusy(false);}
   }
 }
 
@@ -1545,7 +1533,9 @@ function showPhotoFailure(error) {
 }
 
 async function stageFormPhoto(file) {
+  const origin=activeAccountId();
   const compressed = await compressImageFile(file);
+  if(activeAccountId()!==origin)throw new Error('Account changed; photo cancelled.');
   pendingPhotoFile = compressed;
   revokeObjectUrl(pendingPhotoPreview);
   pendingPhotoPreview = URL.createObjectURL(compressed);
@@ -1665,8 +1655,9 @@ async function removePropertyPhoto() {
     if (property) property.thumbnailPath = property.thumbnailPath || '';
     if (property?.thumbnailPath && await askConfirm({ title: 'Remove photo', message: 'Remove this photo?', confirmLabel: 'Remove photo' })) {
       try {
+        await getSupabase().from('property_photos').delete().eq('property_id',property.id).eq('storage_path',property.thumbnailPath);
+        await getSupabase().from('properties').update({thumbnail_path:null}).eq('id',property.id);
         await removeAccountMedia(property.thumbnailPath);
-        await getSupabase().from('properties').update({ thumbnail_path: null }).eq('id', property.id);
         property.thumbnailPath = '';
         await loadProperties();
       } catch (error) {
@@ -1683,12 +1674,12 @@ async function removePropertyPhoto() {
   try {
     if (!String(selected.id).startsWith('thumb-')) {
       const { error } = await getSupabase().from('property_photos').delete().eq('id', selected.id);
-      if (error && !isSchemaSetupError(error)) throw error;
+      if (error) throw error;
     }
-    try { await removeAccountMedia(selected.storagePath); } catch (_) { /* row may already be gone */ }
+    try { await removeAccountMedia(selected.storagePath); } catch (error) { showToast('Record saved; unreferenced file retained for operator cleanup.'); }
     const remaining = (photosByProperty.get(property.id) || []).filter(item => item.id !== selected.id);
     const nextCover = remaining.find(item => item.isPrimary) || remaining[0];
-    await getSupabase().from('properties').update({ thumbnail_path: nextCover?.storagePath || null }).eq('id', property.id);
+    // Database trigger owns primary promotion and thumbnail synchronization.
     await loadProperties();
     await loadPhotos(property.id);
     showToast('Photo removed.');
@@ -1708,10 +1699,8 @@ async function makePhotoPrimary() {
   if (!property || !selected) return;
   try {
     const supabase = getSupabase();
-    await supabase.from('property_photos').update({ is_primary: false }).eq('property_id', property.id);
-    const { error } = await supabase.from('property_photos').update({ is_primary: true }).eq('id', selected.id);
-    if (error) throw error;
-    await supabase.from('properties').update({ thumbnail_path: selected.storagePath }).eq('id', property.id);
+    const {error}=await supabase.rpc('set_primary_photo',{target_photo:selected.id});if(error)throw error;
+
     await loadProperties();
     await loadPhotos(property.id);
     showToast('List photo updated.');
@@ -1827,9 +1816,11 @@ async function submitExpense(event) {
   const formEl = event.currentTarget;
   const errorBox = document.querySelector('#expenseError');
   const spentOn = formEl.spentOn.value;
-  const amount = Number(formEl.amount.value);
+  let amount;
+  try{amount=validateMoney(formEl.amount.value);validateDate(spentOn);}catch(error){errorBox.hidden=false;errorBox.textContent=error.message;return;}
   const category = formEl.category?.value || 'Other';
-  const notes = formEl.notes.value.trim().slice(0, 1000);
+  const notes = formEl.notes.value.trim();
+  if(notes.length>1000){errorBox.hidden=false;errorBox.textContent='Notes exceed 1000 characters.';return;}
   if (!spentOn) { errorBox.hidden = false; errorBox.textContent = 'Please choose a date.'; return; }
   if (!Number.isFinite(amount) || amount < 0) { errorBox.hidden = false; errorBox.textContent = 'Please enter an amount.'; return; }
   const submit = formEl.querySelector('button[type="submit"]');
@@ -1854,9 +1845,11 @@ async function submitExpense(event) {
       const { error } = await supabase.from('expenses').insert(toExpenseRow(saved));
       if (error) throw error;
     }
-    if (pendingReceiptFile) await saveReceiptForExpense(property, saved);
+    editingExpenseId=saved.id;
     await loadExpenses(property.id);
-    await Promise.all((expensesByProperty.get(property.id) || []).map(item => loadReceipts(item.id).catch(() => [])));
+    if (pendingReceiptFile) {try{await saveReceiptForExpense(property,saved);}catch(error){errorBox.hidden=false;errorBox.textContent='Expense saved; receipt not saved. Retry receipt. '+friendlyError(error);return;}}
+    await loadExpenses(property.id);
+    await Promise.all((expensesByProperty.get(property.id) || []).map(item => loadReceipts(item.id)));
     pendingReceiptFile = null;
     revokeObjectUrl(pendingReceiptPreview);
     pendingReceiptPreview = '';
@@ -1871,16 +1864,16 @@ async function submitExpense(event) {
 }
 
 async function saveReceiptForExpense(property, expense, file = pendingReceiptFile) {
+  const accountAtStart=activeAccountId();
   if (!file || !canWrite()) return;
   const readyFile = isPdf(file) ? assertPdfSize(file) : await compressImageFile(file);
   const receiptId = receiptForExpense(expense.id)?.id || makeId();
   const ext = extensionForType(readyFile.type, isPdf(readyFile) ? 'pdf' : 'jpg');
-  const path = receiptObjectPath(activeAccountId(), property.id, expense.id, receiptId, ext);
+  if(activeAccountId()!==accountAtStart)throw new Error('Account changed; receipt cancelled.');
+  const path = receiptObjectPath(accountAtStart, property.id, expense.id, makeId(), ext);
   await uploadAccountMedia(path, readyFile);
   const previous = receiptForExpense(expense.id);
-  if (previous && previous.storagePath && previous.storagePath !== path) {
-    try { await removeAccountMedia(previous.storagePath); } catch (_) { /* keep new file */ }
-  }
+
   const row = {
     id: receiptId,
     account_id: activeAccountId(),
@@ -1890,6 +1883,8 @@ async function saveReceiptForExpense(property, expense, file = pendingReceiptFil
     file_name: readyFile.name || `receipt.${ext}`
   };
   const supabase = getSupabase();
+  try {
+  if(activeAccountId()!==accountAtStart)throw new Error('Account changed; receipt cancelled.');
   if (previous) {
     const { error } = await supabase.from('receipts').update(row).eq('id', receiptId);
     if (error) throw error;
@@ -1897,10 +1892,13 @@ async function saveReceiptForExpense(property, expense, file = pendingReceiptFil
     const { error } = await supabase.from('receipts').insert(row);
     if (error) throw error;
   }
+  }catch(error){try{await removeAccountMedia(path);}catch{showToast('Receipt not committed; staged file retained for operator cleanup.');}throw error;}
+  if(previous?.storagePath && previous.storagePath!==path) {try{await removeAccountMedia(previous.storagePath);}catch(error){showToast('Receipt saved; previous file retained for operator cleanup.');}}
   await loadReceipts(expense.id);
 }
 
 async function applyPickedReceipt(file) {
+  const origin=activeAccountId();
   if (!file || !canWrite()) return;
   if (filePickerContext === 'lease' || filePickerContext === 'correspondence') {
     await applyPickedTenantFile(file);
@@ -1910,6 +1908,7 @@ async function applyPickedReceipt(file) {
   const receiptError = document.querySelector('#receiptError');
   try {
     const ready = isPdf(file) ? assertPdfSize(file) : await compressImageFile(file);
+    if(activeAccountId()!==origin)throw new Error('Account changed; receipt cancelled.');
     pendingReceiptFile = ready;
     revokeObjectUrl(pendingReceiptPreview);
     pendingReceiptPreview = isPdf(ready) ? '' : URL.createObjectURL(ready);
@@ -1953,8 +1952,8 @@ async function removeCurrentReceipt() {
     const receipt = expense ? receiptForExpense(expense.id) : null;
     if (!receipt || !await askConfirm({ title: 'Remove receipt', message: 'Remove this receipt?', confirmLabel: 'Remove' })) return;
     try {
-      await getSupabase().from('receipts').delete().eq('id', receipt.id);
-      try { await removeAccountMedia(receipt.storagePath); } catch (_) { /* row gone */ }
+      const {error:receiptError}=await getSupabase().from('receipts').delete().eq('id',receipt.id);if(receiptError)throw receiptError;
+      try { await removeAccountMedia(receipt.storagePath); } catch (error) { showToast('Record saved; unreferenced file retained for operator cleanup.'); }
       await loadReceipts(expense.id);
     } catch (error) {
       showToast(friendlyError(error));
@@ -1969,10 +1968,10 @@ async function deleteExpense(propertyId, expenseId) {
   if (!canWrite()) return;
   if (!await askConfirm({ title: 'Delete expense', message: 'Delete this expense? This cannot be undone.', confirmLabel: 'Delete expense' })) return;
   try {
-    const receipts = receiptsByExpense.get(expenseId) || await loadReceipts(expenseId).catch(() => []);
+    const receipts = receiptsByExpense.get(expenseId) || await loadReceipts(expenseId);
     const { error } = await getSupabase().from('expenses').delete().eq('id', expenseId);
     if (error) throw error;
-    try { await removeAccountMedia(receipts.map(item => item.storagePath)); } catch (_) { /* rows gone */ }
+    try { await removeAccountMedia(receipts.map(item => item.storagePath)); } catch (error) { showToast('Record saved; unreferenced file retained for operator cleanup.'); }
     receiptsByExpense.delete(expenseId);
     await loadExpenses(propertyId);
     showToast('Expense deleted.');
@@ -2003,42 +2002,15 @@ async function viewMedia(path, alt = '', { gallery = false } = {}) {
 }
 
 async function syncTenantFromProperty(property) {
-  if (!canWrite() || !property) return;
-  const supabase = getSupabase();
-  if (!supabase) return;
-  let existing = tenantByProperty.get(property.id);
-  if (existing === undefined) existing = await loadTenant(property.id).catch(() => null);
-  const vacant = property.status === 'vacant';
-  if (vacant) {
-    if (existing?.id && !String(existing.id).startsWith('legacy-')) {
-      const { error } = await supabase.from('tenants').delete().eq('id', existing.id);
-      if (error && !isSchemaSetupError(error)) throw error;
-    }
-    tenantByProperty.set(property.id, null);
-    return;
-  }
-  const row = {
-    account_id: activeAccountId(),
-    property_id: property.id,
-    name: property.tenantName || '',
-    phone: property.phone || '',
-    email: property.email || ''
-  };
-  if (existing?.id && !String(existing.id).startsWith('legacy-')) {
-    const { error } = await supabase.from('tenants').update(row).eq('id', existing.id);
-    if (error && !isSchemaSetupError(error)) throw error;
-  } else {
-    row.id = makeId();
-    const { error } = await supabase.from('tenants').insert(row);
-    if (error && !isSchemaSetupError(error)) throw error;
-  }
+ if(!canWrite()||!property)return;
+ if(property.status==='vacant'){await getSupabase().rpc('vacate_property',{target_property:property.id});tenantByProperty.set(property.id,null);}
 }
 
 async function refreshPropertyAfterTenant(propertyId) {
   await loadProperties();
   await loadTenant(propertyId);
   const tenant = tenantByProperty.get(propertyId);
-  if (tenant?.id) await loadTenantFiles(tenant.id).catch(() => []);
+  if (tenant?.id) await loadTenantFiles(tenant.id);
   renderDetail(properties.find(item => item.id === propertyId));
 }
 
@@ -2056,7 +2028,8 @@ async function saveTenantFromForm() {
   const name = formEl.name.value.trim();
   const phone = formEl.phone.value.trim();
   const email = formEl.email.value.trim();
-  const notes = formEl.notes.value.trim().slice(0, 1000);
+  const notes = formEl.notes.value.trim();
+  if(notes.length>1000){showToast('Tenant notes must be at most 1,000 characters.');return false;}
   if (!name) {
     if (errorBox) { errorBox.hidden = false; errorBox.textContent = 'Please add the tenant name.'; }
     return false;
@@ -2070,30 +2043,10 @@ async function saveTenantFromForm() {
   try {
     const supabase = getSupabase();
     let existing = tenantByProperty.get(property.id);
-    if (existing === undefined) existing = await loadTenant(property.id).catch(() => null);
-    const row = {
-      account_id: activeAccountId(),
-      property_id: property.id,
-      name,
-      phone,
-      email,
-      notes
-    };
-    if (existing?.id && !String(existing.id).startsWith('legacy-')) {
-      const { error } = await supabase.from('tenants').update(row).eq('id', existing.id);
-      if (error) throw error;
-    } else {
-      row.id = makeId();
-      const { error } = await supabase.from('tenants').insert(row);
-      if (error) throw error;
-    }
-    const { error } = await supabase.from('properties').update({
-      status: 'occupied',
-      tenant_name: name,
-      phone,
-      email
-    }).eq('id', property.id);
-    if (error) throw error;
+    if (existing === undefined) existing = await loadTenant(property.id);
+    const {error}=await supabase.rpc('save_current_tenant',{target_property:property.id,payload:{name,phone,email,notes}});
+    if(error)throw error;
+
     tenantEditorOpen = false;
     setDetailDirty(false);
     showToast('Tenant saved.');
@@ -2120,19 +2073,12 @@ async function markPropertyVacant(propertyId, { fromStatus = false } = {}) {
     const supabase = getSupabase();
     const tenant = tenantByProperty.get(propertyId) || await loadTenant(propertyId);
     if (tenant?.id && !String(tenant.id).startsWith('legacy-')) {
-      const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id).catch(() => []);
+      const files = tenantFilesByTenant.get(tenant.id) || await loadTenantFiles(tenant.id);
       const paths = [...files.map(item => item.storagePath), tenant.leaseStoragePath].filter(Boolean);
-      const { error } = await supabase.from('tenants').delete().eq('id', tenant.id);
-      if (error) throw error;
-      try { await removeAccountMedia(paths); } catch (_) { /* rows gone */ }
-    }
-    const { error } = await supabase.from('properties').update({
-      status: 'vacant',
-      tenant_name: '',
-      phone: '',
-      email: ''
-    }).eq('id', propertyId);
-    if (error) throw error;
+      const {error}=await supabase.rpc('vacate_property',{target_property:propertyId});if(error)throw error;
+      try{await removeAccountMedia(paths);}catch(error){showToast('Tenant removed; unreferenced files retained for cleanup.');}
+    } else {const {error}=await supabase.rpc('vacate_property',{target_property:propertyId});if(error)throw error;}
+
     tenantByProperty.set(propertyId, null);
     tenantEditorOpen = false;
     showToast('Home is vacant.');
@@ -2153,6 +2099,7 @@ function openFileSheet(kind) {
 }
 
 async function applyPickedTenantFile(file) {
+  const accountAtStart=activeAccountId();
   const kind = filePickerContext;
   closeSheets();
   const property = properties.find(item => item.id === detailPropertyId);
@@ -2164,25 +2111,28 @@ async function applyPickedTenantFile(file) {
   }
   const ready = isPdf(file) ? assertPdfSize(file) : await compressImageFile(file);
   const ext = extensionForType(ready.type, isPdf(ready) ? 'pdf' : 'jpg');
-  const supabase = getSupabase();
+  if(activeAccountId()!==accountAtStart)throw new Error('Account changed; file cancelled.');
+  const supabase = getSupabase();let stagedPath=null,metadataCommitted=false;uploadBusy=true;
   try {
     if (kind === 'lease') {
-      const path = leaseObjectPath(activeAccountId(), property.id, ext);
-      await uploadAccountMedia(path, ready);
-      if (tenant.leaseStoragePath && tenant.leaseStoragePath !== path) {
-        try { await removeAccountMedia(tenant.leaseStoragePath); } catch (_) { /* keep new file */ }
-      }
+      const path = tenantFileObjectPath(activeAccountId(), property.id,makeId(),ext);
+      stagedPath=path;await uploadAccountMedia(path, ready);
+      if(activeAccountId()!==accountAtStart)throw new Error('Account changed; file cancelled.');
+
       const { error } = await supabase.from('tenants').update({
         lease_storage_path: path,
         lease_content_type: isPdf(ready) ? 'application/pdf' : (ready.type || ''),
         lease_file_name: ready.name || `lease.${ext}`
       }).eq('id', tenant.id);
       if (error) throw error;
+      metadataCommitted=true;
+      if(tenant.leaseStoragePath && tenant.leaseStoragePath!==path){try{await removeAccountMedia(tenant.leaseStoragePath);}catch(error){showToast('Lease saved; previous file retained for cleanup.');}}
       showToast('Lease saved.');
     } else {
       const fileId = makeId();
       const path = tenantFileObjectPath(activeAccountId(), property.id, fileId, ext);
-      await uploadAccountMedia(path, ready);
+      stagedPath=path;await uploadAccountMedia(path, ready);
+      if(activeAccountId()!==accountAtStart)throw new Error('Account changed; file cancelled.');
       const { error } = await supabase.from('tenant_files').insert({
         id: fileId,
         account_id: activeAccountId(),
@@ -2194,14 +2144,14 @@ async function applyPickedTenantFile(file) {
         file_name: ready.name || `file.${ext}`
       });
       if (error) throw error;
-      showToast('Copy saved.');
+      metadataCommitted=true;showToast('Copy saved.');
     }
     filePickerContext = 'receipt';
     await refreshPropertyAfterTenant(property.id);
   } catch (error) {
-    filePickerContext = 'receipt';
-    showToast(friendlyError(error));
-  }
+    if(stagedPath&&!metadataCommitted){try{await removeAccountMedia(stagedPath);}catch{showToast('Unreferenced upload retained for operator cleanup.');}}
+    filePickerContext = 'receipt';showToast(friendlyError(error));
+  } finally {uploadBusy=false;}
 }
 
 async function removeLease() {
@@ -2216,7 +2166,7 @@ async function removeLease() {
       lease_file_name: ''
     }).eq('id', tenant.id);
     if (error) throw error;
-    try { await removeAccountMedia(tenant.leaseStoragePath); } catch (_) { /* row updated */ }
+    try { await removeAccountMedia(tenant.leaseStoragePath); } catch (error) { showToast('Record saved; unreferenced file retained for operator cleanup.'); }
     showToast('Lease removed.');
     await refreshPropertyAfterTenant(property.id);
   } catch (error) {
@@ -2234,7 +2184,7 @@ async function deleteTenantFile(fileId) {
   try {
     const { error } = await getSupabase().from('tenant_files').delete().eq('id', file.id);
     if (error) throw error;
-    try { await removeAccountMedia(file.storagePath); } catch (_) { /* row gone */ }
+    try { await removeAccountMedia(file.storagePath); } catch (error) { showToast('Record saved; unreferenced file retained for operator cleanup.'); }
     showToast('File removed.');
     await refreshPropertyAfterTenant(property.id);
   } catch (error) {
@@ -2250,7 +2200,8 @@ async function submitAppliance(event) {
   const formEl = event.currentTarget;
   const name = formEl.name.value.trim();
   const fuel = formEl.fuel.value || null;
-  const notes = formEl.notes.value.trim().slice(0, 200);
+  const notes = formEl.notes.value.trim();
+  if(notes.length>200){showToast('Appliance notes must be at most 200 characters.');return;}
   if (!name) {
     showToast('Please name the appliance.');
     return;
@@ -2323,49 +2274,9 @@ function closeModals() {
   if (confirmSheet && !confirmSheet.hidden) settleConfirm(false);
 }
 
-function downloadBackup() {
-  const payload = { app: 'RentManor', version: 1, exportedAt: new Date().toISOString(), properties };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `rentmanor-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  closeModals();
-  showToast('Backup downloaded.');
-}
-
-async function handleRestore(event) {
-  if (sampleMode) { showToast('Sample homes cannot be changed.'); event.target.value = ''; return; }
-  const file = event.target.files[0];
-  event.target.value = '';
-  if (!file || !canWrite()) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
-      const cleaned = readBackupFile(reader.result);
-      if (!window.confirm(`Replace all current properties in this account with ${cleaned.length} ${cleaned.length === 1 ? 'property' : 'properties'} from this backup?`)) return;
-      await replaceAccountProperties(cleaned.map(toRow));
-      await markAccountSeeded();
-      expensesByProperty.clear();
-      receiptsByExpense.clear();
-      await loadProperties();
-      closeModals();
-      activeFilter = 'all';
-      document.querySelectorAll('.filter-button').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));
-      searchInput.value = '';
-      showView('list');
-      showToast('Backup restored.');
-    } catch (error) {
-      showToast(error?.message === 'No property list' ? 'That file could not be restored.' : friendlyError(error));
-    }
-  };
-  reader.onerror = () => showToast('Could not read that file.');
-  reader.readAsText(file);
-}
+function recoveryStatus(message){const el=document.querySelector('#recoveryStatus');if(el)el.textContent=message;showToast(message,5000);}
+async function downloadBackup(){try{await downloadCompleteBackup(recoveryStatus);}catch(error){recoveryStatus(error.name==='AbortError'?'Backup cancelled; no changes made.':friendlyError(error));}}
+async function handleRestore(event){const file=event.target.files?.[0];event.target.value='';if(!file||!canWrite())return;try{await restoreFromFile(file,recoveryStatus);resetLocalState();await loadProperties();showView('list');}catch(error){recoveryStatus(error.name==='AbortError'?'Restore cancelled before commit.':friendlyError(error));}}
 
 function updateLegacyButton() {
   legacyImportButton.hidden = sampleMode || getLegacyProperties().length === 0;
@@ -2387,12 +2298,18 @@ function openImportPanel(mode) {
   importPanel.hidden = false;
 }
 
+let importingLegacy=false;
 async function importLegacyProperties() {
+  if(importingLegacy)return;
   if (sampleMode) { showToast('Sample homes cannot be changed.'); return; }
   const legacy = getLegacyProperties();
   if (!legacy.length) return;
+  importingLegacy=true;
   try {
-    await insertProperties(legacy.map(property => ({ ...property, id: makeId() })));
+    const rows=[];const {data:snap,error}=await getSupabase().rpc('account_snapshot',{target_account:activeAccountId()});if(error)throw error;
+    for(const property of legacy){validateProperty(property);const fingerprint=await legacyFingerprint(property);if(!snap.tables.properties.some(r=>r.import_fingerprint===fingerprint))rows.push({...toRow({...property,id:makeId()}),thumbnail_path:null,import_fingerprint:fingerprint});}
+    if(!await askConfirm({title:'Import older records',message:'Add '+rows.length+' new records? Similar addresses remain separate; existing data/files are preserved.',confirmLabel:'Import'}))return;
+    const imported=await getSupabase().rpc('replace_account_properties',{target_account:activeAccountId(),payload:rows});if(imported.error)throw imported.error;
     await markAccountSeeded();
     markLegacyOffered();
     await loadProperties();
@@ -2401,7 +2318,7 @@ async function importLegacyProperties() {
     showToast('Those homes are now in your account.');
   } catch (error) {
     showToast(friendlyError(error));
-  }
+  }finally{importingLegacy=false;}
 }
 
 async function afterPropertiesReady() {
@@ -2422,6 +2339,7 @@ function updateAccountSummary() {
   const email = user?.email || 'your email';
   const name = account?.name || 'Your account';
   summary.textContent = `Signed in as ${email}. Homes in “${name}” stay private to this account.`;
+  const selector=document.querySelector('#accountSelector');if(selector)selector.innerHTML=listAccounts().map(a=>`<option value="${escapeHTML(a.id)}" ${a.id===account?.id?'selected':''}>${escapeHTML(a.name)}</option>`).join('');
   inviteButton.hidden = sampleMode || !isOwner();
 }
 
@@ -2443,6 +2361,9 @@ async function openInvitePanel() {
   invitePanel.hidden = false;
   try {
     const members = await listMembers();
+    const {data:invites,error:inviteError}=await getSupabase().from('account_invites').select('id,email,expires_at,accepted_at,revoked_at').eq('account_id',activeAccountId());if(inviteError)throw inviteError;
+    const pending=document.querySelector('#pendingInvites');if(pending){pending.innerHTML=(invites||[]).filter(i=>!i.accepted_at&&!i.revoked_at&&new Date(i.expires_at)>new Date()).map(i=>'<p>'+escapeHTML(i.email||'Unrestricted link')+' <button type="button" data-revoke-invite="'+i.id+'">Revoke</button></p>').join('');}
+    pending?.querySelectorAll('[data-revoke-invite]').forEach(button=>button.addEventListener('click',async()=>{try{const {error}=await getSupabase().rpc('revoke_invite',{target_invite:button.dataset.revokeInvite});if(error)throw error;await openInvitePanel();}catch(error){showToast(friendlyError(error));}}));
     if (!members.length) {
       memberList.textContent = '';
       return;
@@ -2513,6 +2434,15 @@ function bindUi() {
   }));
   form.addEventListener('submit', submitForm);
   deleteButton.addEventListener('click', () => deleteProperty());
+  document.querySelector('#cancelRecovery')?.addEventListener('click',cancelRecovery);
+  document.querySelector('#accountSelector')?.addEventListener('change',async event=>{
+    if(currentView==='form'||currentView==='expense'){if(!window.confirm('Discard this unsaved form before switching accounts?')){updateAccountSummary();return;}}
+    if(recoveryBusy()||uploadBusy){showToast('Finish or cancel the current operation before switching.');updateAccountSummary();return;}
+    if(await confirmLeaveDirtyTab()!=='ok'){updateAccountSummary();return;}
+    try{const selected=event.target.value;closeModals();closeSheets();pendingPhotoFile=null;pendingReceiptFile=null;pendingExport=null;revokeObjectUrl(pendingPhotoPreview);revokeObjectUrl(pendingReceiptPreview);pendingPhotoPreview='';pendingReceiptPreview='';clearMediaCache();resetLocalState();await switchAccount(selected);}catch(error){showToast(friendlyError(error));}
+  });
+  window.addEventListener('beforeunload',event=>{if(isDetailDirty()||recoveryBusy()||currentView==='form'||currentView==='expense'){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('offline',()=>showToast('Offline: private changes require a connection. The local sample remains available.',5000));
   document.querySelector('#accountButton').addEventListener('click', openAccountMenu);
   document.querySelector('#backupButton').addEventListener('click', () => { accountPanel.hidden = true; backupPanel.hidden = false; });
   document.querySelector('#downloadButton').addEventListener('click', downloadBackup);
@@ -2800,6 +2730,10 @@ function bindUi() {
 }
 
 function resetLocalState() {
+  exportGeneration++;
+  closeModals();form.reset();
+  if(detailView)detailView.innerHTML='';if(expenseView)expenseView.innerHTML='';
+  const oldImage=document.querySelector('#lightboxImage');if(oldImage)oldImage.removeAttribute('src');
   properties = [];
   expensesByProperty = new Map();
   receiptsByExpense = new Map();
@@ -2828,10 +2762,13 @@ startAuth(async ({ status, notice }) => {
   sampleMode = status === 'sample';
   updateSampleChrome();
   if (status === 'need-config' || status === 'signed-out') {
+    cancelRecovery();
+    clearMediaCache();pendingPhotoFile=null;pendingReceiptFile=null;pendingExport=null;revokeObjectUrl(pendingPhotoPreview);revokeObjectUrl(pendingReceiptPreview);pendingPhotoPreview='';pendingReceiptPreview='';
     resetLocalState();
     return;
   }
   if (status === 'sample') {
+    clearMediaCache();resetLocalState();
     try {
       expensesByProperty = new Map();
       receiptsByExpense = new Map();
@@ -2849,6 +2786,7 @@ startAuth(async ({ status, notice }) => {
     return;
   }
   if (status !== 'signed-in') return;
+  clearMediaCache();resetLocalState();
   try {
     expensesByProperty = new Map();
     receiptsByExpense = new Map();

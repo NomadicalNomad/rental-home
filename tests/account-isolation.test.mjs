@@ -52,7 +52,7 @@ test('sample mode is #/sample only and does not copy into a personal account', (
   assert.equal(isSampleHash('#/sample'), true);
   assert.equal(scopedAccountId({ sampleMode: true, accountId: FRESH_ACCOUNT }), SAMPLE_ACCOUNT_ID);
   const sample = samplePortfolio();
-  assert.equal(sample.length, 4);
+  assert.equal(sample.length, 3);
   assert.ok(sample.every(row => row.account_id === SAMPLE_ACCOUNT_ID));
   assert.equal(personalListFromRows(sample, FRESH_ACCOUNT).length, 0);
 });
